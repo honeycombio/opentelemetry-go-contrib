@@ -128,7 +128,7 @@ func WithErrorHandler(handler otel.ErrorHandler) Option {
 // how often the controller collects and exports metric data.
 func WithMetricReportingPeriod(p time.Duration) Option {
 	return func(c *Config) {
-		c.MetricReportingPeriod = fmt.Sprint(p)
+		c.MetricsReportingPeriod = fmt.Sprint(p)
 	}
 }
 
@@ -203,7 +203,7 @@ type Config struct {
 	MetricsExporterEndpoint         string   `env:"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,default=localhost:4317"`
 	MetricsExporterEndpointInsecure bool     `env:"OTEL_EXPORTER_OTLP_METRICS_INSECURE,default=false"`
 	MetricsEnabled                  bool     `env:"OTEL_METRICS_ENABLED,default=true"`
-	MetricReportingPeriod           string   `env:"OTEL_EXPORTER_OTLP_METRIC_PERIOD,default=30s"`
+	MetricsReportingPeriod          string   `env:"OTEL_EXPORTER_OTLP_METRICS_PERIOD,default=30s"`
 	LogLevel                        string   `env:"OTEL_LOG_LEVEL,default=info"`
 	Propagators                     []string `env:"OTEL_PROPAGATORS,default=tracecontext,baggage"`
 	ResourceAttributes              map[string]string
@@ -364,7 +364,7 @@ func setupMetrics(c Config) (func() error, error) {
 		Insecure:        c.MetricsExporterEndpointInsecure,
 		Headers:         c.Headers,
 		Resource:        c.Resource,
-		ReportingPeriod: c.MetricReportingPeriod,
+		ReportingPeriod: c.MetricsReportingPeriod,
 	})
 }
 
