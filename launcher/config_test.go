@@ -27,7 +27,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.10.0"
 )
 
 const (
@@ -83,14 +83,15 @@ func (t *testErrorHandler) Handle(err error) {
 	fmt.Printf("test error handler handled error: %v\n", err)
 }
 
-func TestInvalidServiceName(t *testing.T) {
-	logger := &testLogger{}
-	shutdown, _ := ConfigureOpenTelemetry(WithLogger(logger))
-	defer shutdown()
+// TODO REVIEW TEST - want default service name anyway
+// func TestInvalidServiceName(t *testing.T) {
+// 	logger := &testLogger{}
+// 	shutdown, _ := ConfigureOpenTelemetry(WithLogger(logger))
+// 	defer shutdown()
 
-	expected := "invalid configuration: service name missing"
-	logger.requireContains(t, expected)
-}
+// 	expected := "invalid configuration: service name missing"
+// 	logger.requireContains(t, expected)
+// }
 
 func testEndpointDisabled(t *testing.T, expected string, opts ...Option) {
 	logger := &testLogger{}
@@ -147,7 +148,7 @@ func TestValidConfig(t *testing.T) {
 }
 
 func TestInvalidEnvironment(t *testing.T) {
-	os.Setenv("OTEL_EXPORTER_OTLP_METRIC_INSECURE", "bleargh")
+	os.Setenv("OTEL_EXPORTER_OTLP_METRICS_INSECURE", "bleargh")
 
 	logger := &testLogger{}
 	shutdown, _ := ConfigureOpenTelemetry(
@@ -161,7 +162,7 @@ func TestInvalidEnvironment(t *testing.T) {
 }
 
 func TestInvalidMetricsPushIntervalEnv(t *testing.T) {
-	os.Setenv("OTEL_EXPORTER_OTLP_METRIC_PERIOD", "300million")
+	os.Setenv("OTEL_EXPORTER_OTLP_METRICS_PERIOD", "300million")
 
 	logger := &testLogger{}
 	shutdown, _ := ConfigureOpenTelemetry(
@@ -214,6 +215,7 @@ func TestDebugEnabled(t *testing.T) {
 	assert.Contains(t, output, "host456")
 }
 
+// TODO Review test - service version funky
 func TestDefaultConfig(t *testing.T) {
 	logger := &testLogger{}
 	handler := &testErrorHandler{}
@@ -231,16 +233,17 @@ func TestDefaultConfig(t *testing.T) {
 	}
 
 	expected := Config{
-		ServiceName:                     "",
-		ServiceVersion:                  "unknown",
 		TracesExporterEndpoint:          "localhost:4317",
 		TracesExporterEndpointInsecure:  false,
+		TracesEnabled:                   true,
+		ServiceName:                     "",
+		ServiceVersion:                  "unknown",
 		MetricsExporterEndpoint:         "localhost:4317",
 		MetricsExporterEndpointInsecure: false,
-		MetricReportingPeriod:           "30s",
 		MetricsEnabled:                  true,
+		MetricsReportingPeriod:          "30s",
 		LogLevel:                        "info",
-		Propagators:                     []string{"tracecontext,baggage"},
+		Propagators:                     []string{"tracecontext", "baggage"},
 		Resource:                        resource.NewWithAttributes(semconv.SchemaURL, attributes...),
 		Logger:                          logger,
 		errorHandler:                    handler,
@@ -267,20 +270,21 @@ func TestEnvironmentVariables(t *testing.T) {
 	}
 
 	expected := Config{
-		ServiceName:                     "test-service-name",
-		ServiceVersion:                  "test-service-version",
 		TracesExporterEndpoint:          "satellite-url",
 		TracesExporterEndpointInsecure:  true,
+		TracesEnabled:                   true,
+		ServiceName:                     "test-service-name",
+		ServiceVersion:                  "test-service-version",
 		MetricsExporterEndpoint:         "metrics-url",
 		MetricsExporterEndpointInsecure: true,
-		MetricReportingPeriod:           "30s",
+		MetricsEnabled:                  false,
+		MetricsReportingPeriod:          "30s",
 		LogLevel:                        "debug",
 		Propagators:                     []string{"b3", "w3c"},
 		Resource:                        resource.NewWithAttributes(semconv.SchemaURL, attributes...),
 		Logger:                          logger,
 		errorHandler:                    handler,
 	}
-	unsetEnvironment()
 	assert.Equal(t, expected, config)
 
 }
@@ -318,7 +322,7 @@ func TestConfigurationOverrides(t *testing.T) {
 		TracesExporterEndpointInsecure:  false,
 		MetricsExporterEndpoint:         "override-metrics-url",
 		MetricsExporterEndpointInsecure: false,
-		MetricReportingPeriod:           "30s",
+		MetricsReportingPeriod:          "30s",
 		LogLevel:                        "info",
 		Propagators:                     []string{"b3"},
 		Resource:                        resource.NewWithAttributes(semconv.SchemaURL, attributes...),
@@ -516,30 +520,30 @@ func TestConfigWithResourceAttributes(t *testing.T) {
 }
 
 func setEnvironment() {
+	os.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "satellite-url")
+	os.Setenv("OTEL_EXPORTER_OTLP_TRACES_INSECURE", "true")
 	os.Setenv("OTEL_SERVICE_NAME", "test-service-name")
 	os.Setenv("OTEL_SERVICE_VERSION", "test-service-version")
-	os.Setenv("OTEL_EXPORTER_OTLP_SPAN_ENDPOINT", "satellite-url")
-	os.Setenv("OTEL_EXPORTER_OTLP_SPAN_INSECURE", "true")
-	os.Setenv("OTEL_EXPORTER_OTLP_METRIC_ENDPOINT", "metrics-url")
-	os.Setenv("OTEL_EXPORTER_OTLP_METRIC_INSECURE", "true")
+	os.Setenv("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT", "metrics-url")
+	os.Setenv("OTEL_EXPORTER_OTLP_METRICS_INSECURE", "true")
+	os.Setenv("OTEL_METRICS_ENABLED", "false")
 	os.Setenv("OTEL_LOG_LEVEL", "debug")
 	os.Setenv("OTEL_PROPAGATORS", "b3,w3c")
 	os.Setenv("OTEL_RESOURCE_ATTRIBUTES", "service.name=test-service-name-b")
-	os.Setenv("OTEL_METRICS_ENABLED", "false")
 }
 
 func unsetEnvironment() {
 	vars := []string{
 		"OTEL_SERVICE_NAME",
 		"OTEL_SERVICE_VERSION",
-		"OTEL_EXPORTER_OTLP_SPAN_ENDPOINT",
-		"OTEL_EXPORTER_OTLP_SPAN_INSECURE",
-		"OTEL_EXPORTER_OTLP_METRIC_ENDPOINT",
-		"OTEL_EXPORTER_OTLP_METRIC_INSECURE",
+		"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+		"OTEL_EXPORTER_OTLP_TRACES_INSECURE",
+		"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+		"OTEL_EXPORTER_OTLP_METRICS_INSECURE",
 		"OTEL_LOG_LEVEL",
 		"OTEL_PROPAGATORS",
 		"OTEL_RESOURCE_ATTRIBUTES",
-		"OTEL_EXPORTER_OTLP_METRIC_PERIOD",
+		"OTEL_EXPORTER_OTLP_METRICS_PERIOD",
 		"OTEL_METRICS_ENABLED",
 	}
 	for _, envvar := range vars {
