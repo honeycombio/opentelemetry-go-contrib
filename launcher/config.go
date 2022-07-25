@@ -139,6 +139,13 @@ func WithMetricsEnabled(enabled bool) Option {
 	}
 }
 
+// WithTracesEnabled configures whether traces should be enabled
+func WithTracesEnabled(enabled bool) Option {
+	return func(c *Config) {
+		c.TracesEnabled = enabled
+	}
+}
+
 // WithSpanProcessor adds one or more SpanProcessors
 func WithSpanProcessor(sp ...trace.SpanProcessor) Option {
 	return func(c *Config) {
@@ -196,9 +203,9 @@ type Config struct {
 	MetricsExporterEndpoint         string   `env:"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,default=localhost:4317"`
 	MetricsExporterEndpointInsecure bool     `env:"OTEL_EXPORTER_OTLP_METRICS_INSECURE,default=false"`
 	MetricsEnabled                  bool     `env:"OTEL_METRICS_ENABLED,default=true"`
+	MetricReportingPeriod           string   `env:"OTEL_EXPORTER_OTLP_METRIC_PERIOD,default=30s"`
 	LogLevel                        string   `env:"OTEL_LOG_LEVEL,default=info"`
 	Propagators                     []string `env:"OTEL_PROPAGATORS,default=tracecontext,baggage"`
-	MetricReportingPeriod           string   `env:"OTEL_EXPORTER_OTLP_METRIC_PERIOD,default=30s"`
 	ResourceAttributes              map[string]string
 	ResourceAttributesFromEnv       string `env:"OTEL_RESOURCE_ATTRIBUTES"`
 
@@ -246,6 +253,9 @@ type Launcher struct {
 
 // these are set as key=value, not key:value
 func getHeadersFromEnv(c *Config) map[string]string {
+	if c.HeadersFromEnv == "" {
+		return nil
+	}
 	HeadersFromEnv := strings.Split(c.HeadersFromEnv, ",")
 	mapHeaders := make(map[string]string)
 	for _, e := range HeadersFromEnv {
@@ -257,6 +267,9 @@ func getHeadersFromEnv(c *Config) map[string]string {
 
 // these are set as key=value, not key:value
 func getResourceAttrsFromEnv(c *Config) map[string]string {
+	if c.ResourceAttributesFromEnv == "" {
+		return nil
+	}
 	ResourceAttrsFromEnv := strings.Split(c.ResourceAttributesFromEnv, ",")
 	mapResourceAttrs := make(map[string]string)
 	for _, e := range ResourceAttrsFromEnv {
