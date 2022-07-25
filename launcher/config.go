@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-go-contrib/launcher/pipelines"
@@ -28,7 +29,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.10.0"
 )
 
 var (
@@ -185,19 +186,21 @@ func (l *defaultHandler) Handle(err error) {
 }
 
 type Config struct {
-	TracesExporterEndpoint          string            `env:"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,default=localhost:4317"`
-	TracesExporterEndpointInsecure  bool              `env:"OTEL_EXPORTER_OTLP_TRACES_INSECURE,default=false"`
-	TracesEnabled                   bool              `env:"OTEL_TRACES_ENABLED,default=true"`
-	ServiceName                     string            `env:"OTEL_SERVICE_NAME"`
-	ServiceVersion                  string            `env:"OTEL_SERVICE_VERSION"`
-	Headers                         map[string]string `env:"OTEL_EXPORTER_OTLP_HEADERS"`
-	MetricsExporterEndpoint         string            `env:"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,default=localhost:4317"`
-	MetricsExporterEndpointInsecure bool              `env:"OTEL_EXPORTER_OTLP_METRICS_INSECURE,default=false"`
-	MetricsEnabled                  bool              `env:"OTEL_METRICS_ENABLED,default=true"`
-	LogLevel                        string            `env:"OTEL_LOG_LEVEL,default=info"`
-	Propagators                     []string          `env:"OTEL_PROPAGATORS,default=tracecontext,baggage"`
-	MetricReportingPeriod           string            `env:"OTEL_EXPORTER_OTLP_METRIC_PERIOD,default=30s"`
-	ResourceAttributes              map[string]string `env:"OTEL_RESOURCE_ATTRIBUTES"`
+	TracesExporterEndpoint          string `env:"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,default=localhost:4317"`
+	TracesExporterEndpointInsecure  bool   `env:"OTEL_EXPORTER_OTLP_TRACES_INSECURE,default=false"`
+	TracesEnabled                   bool   `env:"OTEL_TRACES_ENABLED,default=true"`
+	ServiceName                     string `env:"OTEL_SERVICE_NAME"`
+	ServiceVersion                  string `env:"OTEL_SERVICE_VERSION"`
+	Headers                         map[string]string
+	HeadersFromEnv                  string   `env:"OTEL_EXPORTER_OTLP_HEADERS"`
+	MetricsExporterEndpoint         string   `env:"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,default=localhost:4317"`
+	MetricsExporterEndpointInsecure bool     `env:"OTEL_EXPORTER_OTLP_METRICS_INSECURE,default=false"`
+	MetricsEnabled                  bool     `env:"OTEL_METRICS_ENABLED,default=true"`
+	LogLevel                        string   `env:"OTEL_LOG_LEVEL,default=info"`
+	Propagators                     []string `env:"OTEL_PROPAGATORS,default=tracecontext,baggage"`
+	MetricReportingPeriod           string   `env:"OTEL_EXPORTER_OTLP_METRIC_PERIOD,default=30s"`
+	ResourceAttributes              map[string]string
+	ResourceAttributesFromEnv       string `env:"OTEL_RESOURCE_ATTRIBUTES"`
 
 	SpanProcessors    []trace.SpanProcessor
 	Resource          *resource.Resource
@@ -208,7 +211,8 @@ type Config struct {
 
 func newConfig(opts ...Option) *Config {
 	c := &Config{
-		Headers: map[string]string{},
+		Headers:            map[string]string{},
+		ResourceAttributes: map[string]string{},
 	}
 	envError := envconfig.Process(context.Background(), c)
 	c.Logger = &DefaultLogger{}
@@ -228,6 +232,9 @@ func newConfig(opts ...Option) *Config {
 		opt(c)
 	}
 
+	if len(c.HeadersFromEnv) > 0 {
+		c.Headers = getHeadersFromEnv(c)
+	}
 	c.Resource = newResource(c)
 	return c
 }
@@ -237,9 +244,32 @@ type Launcher struct {
 	shutdownFuncs []func() error
 }
 
+// these are set as key=value, not key:value
+func getHeadersFromEnv(c *Config) map[string]string {
+	HeadersFromEnv := strings.Split(c.HeadersFromEnv, ",")
+	mapHeaders := make(map[string]string)
+	for _, e := range HeadersFromEnv {
+		headers := strings.Split(e, "=")
+		mapHeaders[headers[0]] = headers[1]
+	}
+	return mapHeaders
+}
+
+// these are set as key=value, not key:value
+func getResourceAttrsFromEnv(c *Config) map[string]string {
+	ResourceAttrsFromEnv := strings.Split(c.ResourceAttributesFromEnv, ",")
+	mapResourceAttrs := make(map[string]string)
+	for _, e := range ResourceAttrsFromEnv {
+		resourceAttrs := strings.Split(e, "=")
+		mapResourceAttrs[resourceAttrs[0]] = resourceAttrs[1]
+	}
+	return mapResourceAttrs
+}
+
 func newResource(c *Config) *resource.Resource {
 	r := resource.Environment()
 
+	c.ResourceAttributes = getResourceAttrsFromEnv(c)
 	hostnameSet := false
 	for iter := r.Iter(); iter.Next(); {
 		if iter.Attribute().Key == semconv.HostNameKey && len(iter.Attribute().Value.Emit()) > 0 {
