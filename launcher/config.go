@@ -23,7 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/open-telemetry/opentelemetry-go-contrib/launcher/pipelines"
+	// TODO: before merging, update to "go.opentelemetry.io/contrib/launcher"
+	"github.com/honeycombio/opentelemetry-go-contrib/launcher/pipelines"
 	"github.com/sethvargo/go-envconfig"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
