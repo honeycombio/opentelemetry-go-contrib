@@ -36,6 +36,7 @@ import (
 var (
 	SetVendorOptions func() []Option
 	ValidateConfig   func(*Config) error
+	defaultLogger    Logger = &DefaultLogger{}
 )
 
 type Option func(*Config)
@@ -169,6 +170,11 @@ type Logger interface {
 }
 
 func WithLogger(logger Logger) Option {
+	// In order to enable the environment parsing to send an error to the specified logger
+	// we need to cache a copy of the logger in a package variable so that newConfig can use it
+	// before we ever call the function returned by WithLogger. This is slightly messy, but
+	// consistent with expected behavior of autoinstrumentation.
+	defaultLogger = logger
 	return func(c *Config) {
 		c.Logger = logger
 	}
@@ -221,10 +227,10 @@ func newConfig(opts ...Option) *Config {
 	c := &Config{
 		Headers:            map[string]string{},
 		ResourceAttributes: map[string]string{},
+		Logger:             defaultLogger,
+		errorHandler:       &defaultHandler{logger: defaultLogger},
 	}
 	envError := envconfig.Process(context.Background(), c)
-	c.Logger = &DefaultLogger{}
-	c.errorHandler = &defaultHandler{logger: c.Logger}
 	if envError != nil {
 		c.Logger.Fatalf("environment error: %v", envError)
 	}
