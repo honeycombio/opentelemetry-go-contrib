@@ -1,7 +1,7 @@
 // TODO: before merging, change module to "go.opentelemetry.io/contrib/launcher"
 module github.com/honeycombio/opentelemetry-go-contrib/launcher
 
-go 1.18
+go 1.17
 
 require (
 	github.com/sethvargo/go-envconfig v0.6.2
