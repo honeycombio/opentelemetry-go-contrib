@@ -206,7 +206,7 @@ type Config struct {
 	TracesExporterEndpointInsecure  bool     `env:"OTEL_EXPORTER_OTLP_TRACES_INSECURE,default=false"`
 	TracesEnabled                   bool     `env:"OTEL_TRACES_ENABLED,default=true"`
 	ServiceName                     string   `env:"OTEL_SERVICE_NAME"`
-	ServiceVersion                  string   `env:"OTEL_SERVICE_VERSION"`
+	ServiceVersion                  string   `env:"OTEL_SERVICE_VERSION,default=unknown"`
 	MetricsExporterEndpoint         string   `env:"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,default=localhost:4317"`
 	MetricsExporterEndpointInsecure bool     `env:"OTEL_EXPORTER_OTLP_METRICS_INSECURE,default=false"`
 	MetricsEnabled                  bool     `env:"OTEL_METRICS_ENABLED,default=true"`

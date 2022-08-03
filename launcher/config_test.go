@@ -233,7 +233,7 @@ func TestDefaultConfig(t *testing.T) {
 		attribute.String("telemetry.sdk.version", version),
 	}
 
-	expected := Config{
+	expected := &Config{
 		TracesExporterEndpoint:          "localhost:4317",
 		TracesExporterEndpointInsecure:  false,
 		TracesEnabled:                   true,
@@ -244,6 +244,8 @@ func TestDefaultConfig(t *testing.T) {
 		MetricsEnabled:                  true,
 		MetricsReportingPeriod:          "30s",
 		LogLevel:                        "info",
+		Headers:                         map[string]string{},
+		ResourceAttributes:              map[string]string{},
 		Propagators:                     []string{"tracecontext", "baggage"},
 		Resource:                        resource.NewWithAttributes(semconv.SchemaURL, attributes...),
 		Logger:                          logger,
@@ -270,7 +272,7 @@ func TestEnvironmentVariables(t *testing.T) {
 		attribute.String("telemetry.sdk.version", version),
 	}
 
-	expected := Config{
+	expected := &Config{
 		TracesExporterEndpoint:          "satellite-url",
 		TracesExporterEndpointInsecure:  true,
 		TracesEnabled:                   true,
@@ -281,13 +283,16 @@ func TestEnvironmentVariables(t *testing.T) {
 		MetricsEnabled:                  false,
 		MetricsReportingPeriod:          "30s",
 		LogLevel:                        "debug",
+		Headers:                         map[string]string{},
+		ResourceAttributes:              map[string]string{},
+		ResourceAttributesFromEnv:       "service.name=test-service-name-b",
 		Propagators:                     []string{"b3", "w3c"},
 		Resource:                        resource.NewWithAttributes(semconv.SchemaURL, attributes...),
 		Logger:                          logger,
 		errorHandler:                    handler,
 	}
 	assert.Equal(t, expected, config)
-
+	unsetEnvironment()
 }
 
 func TestConfigurationOverrides(t *testing.T) {
@@ -316,21 +321,26 @@ func TestConfigurationOverrides(t *testing.T) {
 		attribute.String("telemetry.sdk.version", version),
 	}
 
-	expected := Config{
+	expected := &Config{
 		ServiceName:                     "override-service-name",
 		ServiceVersion:                  "override-service-version",
 		TracesExporterEndpoint:          "override-satellite-url",
 		TracesExporterEndpointInsecure:  false,
+		TracesEnabled:                   true,
 		MetricsExporterEndpoint:         "override-metrics-url",
 		MetricsExporterEndpointInsecure: false,
 		MetricsReportingPeriod:          "30s",
 		LogLevel:                        "info",
+		Headers:                         map[string]string{},
+		ResourceAttributes:              map[string]string{},
+		ResourceAttributesFromEnv:       "service.name=test-service-name-b",
 		Propagators:                     []string{"b3"},
 		Resource:                        resource.NewWithAttributes(semconv.SchemaURL, attributes...),
 		Logger:                          logger,
 		errorHandler:                    handler,
 	}
 	assert.Equal(t, expected, config)
+	unsetEnvironment()
 }
 
 type TestCarrier struct {
