@@ -73,7 +73,7 @@ func (logger *testLogger) requireNotContains(t *testing.T, expected string) {
 }
 
 func (logger *testLogger) reset() {
-	logger.output = nil
+	logger.output = []string{}
 }
 
 type testErrorHandler struct {
@@ -502,10 +502,8 @@ func TestServiceNameViaResourceAttributes(t *testing.T) {
 	shutdown, _ := ConfigureOpenTelemetry(WithLogger(logger))
 	defer shutdown()
 
-	expected := "invalid configuration: service name missing"
-	if strings.Contains(logger.output[0], expected) {
-		t.Errorf("\nString found: %v\nIn: %v", expected, logger.output[0])
-	}
+	notExpected := "invalid configuration: service name missing"
+	logger.requireNotContains(t, notExpected)
 }
 
 func TestEmptyHostnameDefaultsToOsHostname(t *testing.T) {
