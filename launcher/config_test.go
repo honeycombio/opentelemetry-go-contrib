@@ -363,7 +363,7 @@ func (t TestCarrier) Set(key string, value string) {
 	t.values[key] = value
 }
 
-func TestConfigurePropagators(t *testing.T) {
+func TestConfigurePropagators1(t *testing.T) {
 	mem1, _ := baggage.NewMember("keyone", "foo1")
 	mem2, _ := baggage.NewMember("keytwo", "bar1")
 	bag, _ := baggage.New(mem1, mem2)
@@ -372,44 +372,65 @@ func TestConfigurePropagators(t *testing.T) {
 
 	unsetEnvironment()
 	logger := &testLogger{}
-	shutdown, _ := ConfigureOpenTelemetry(
+	shutdown, err := ConfigureOpenTelemetry(
 		WithLogger(logger),
 		WithServiceName("test-service"),
 		WithSpanExporterEndpoint("localhost:443"),
 	)
+	assert.NoError(t, err)
 	defer shutdown()
-	ctx, finish := otel.Tracer("ex.com/basic").Start(ctx, "foo")
+
+	ctx, finish := otel.Tracer("sampletracer").Start(ctx, "foo")
 	defer finish.End()
+
 	carrier := TestCarrier{values: map[string]string{}}
 	prop := otel.GetTextMapPropagator()
 	prop.Inject(ctx, carrier)
-	assert.Greater(t, len(carrier.Get("x-b3-traceid")), 0)
-	assert.Equal(t, "", carrier.Get("baggage"))
-	assert.Equal(t, len(carrier.Get("traceparent")), 0)
+	assert.Equal(t, "keyone=foo1,keytwo=bar1", carrier.Get("baggage"))
+	assert.Greater(t, len(carrier.Get("traceparent")), 0)
+}
 
-	shutdown, _ = ConfigureOpenTelemetry(
+func TestConfigurePropagators2(t *testing.T) {
+	mem1, _ := baggage.NewMember("keyone", "foo1")
+	mem2, _ := baggage.NewMember("keytwo", "bar1")
+	bag, _ := baggage.New(mem1, mem2)
+
+	ctx := baggage.ContextWithBaggage(context.Background(), bag)
+
+	unsetEnvironment()
+	logger := &testLogger{}
+	shutdown, err := ConfigureOpenTelemetry(
 		WithLogger(logger),
 		WithServiceName("test-service"),
 		WithSpanExporterEndpoint("localhost:443"),
 		WithPropagators([]string{"b3", "baggage", "tracecontext"}),
 	)
+	assert.NoError(t, err)
 	defer shutdown()
-	carrier = TestCarrier{values: map[string]string{}}
-	prop = otel.GetTextMapPropagator()
+
+	ctx, finish := otel.Tracer("sampletracer").Start(ctx, "foo")
+	defer finish.End()
+
+	carrier := TestCarrier{values: map[string]string{}}
+	prop := otel.GetTextMapPropagator()
 	prop.Inject(ctx, carrier)
 	assert.Greater(t, len(carrier.Get("x-b3-traceid")), 0)
 	assert.Contains(t, carrier.Get("baggage"), "keytwo=bar1")
 	assert.Contains(t, carrier.Get("baggage"), "keyone=foo1")
 	assert.Greater(t, len(carrier.Get("traceparent")), 0)
+}
 
-	logger = &testLogger{}
-	shutdown, _ = ConfigureOpenTelemetry(
+func TestConfigurePropagators3(t *testing.T) {
+	unsetEnvironment()
+	logger := &testLogger{}
+	shutdown, err := ConfigureOpenTelemetry(
 		WithLogger(logger),
 		WithServiceName("test-service"),
 		WithSpanExporterEndpoint("localhost:443"),
 		WithPropagators([]string{"invalid"}),
 		WithMetricExporterEndpoint("localhost:443"),
 	)
+	assert.NoError(t, err)
 	defer shutdown()
 
 	expected := "invalid configuration: unsupported propagators. Supported options: b3,baggage,tracecontext,ottrace"
