@@ -137,6 +137,7 @@ func TestValidConfig(t *testing.T) {
 	shutdown, _ = ConfigureOpenTelemetry(
 		WithLogger(logger),
 		WithServiceName("test-service"),
+		// we think this is slow because it's trying to export metrics to an invalid endpoint
 		WithMetricExporterEndpoint("localhost:443"),
 		WithSpanExporterEndpoint("localhost:443"),
 	)
