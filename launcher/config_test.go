@@ -34,6 +34,8 @@ import (
 	"google.golang.org/grpc"
 )
 
+//revive:disable:import-shadowing this is a test file
+
 const (
 	expectedTracingDisabledMessage = "tracing is disabled by configuration: no endpoint set"
 	expectedMetricsDisabledMessage = "metrics are disabled by configuration: no endpoint set"
@@ -197,7 +199,7 @@ func TestValidConfig(t *testing.T) {
 }
 
 func TestInvalidEnvironment(t *testing.T) {
-	os.Setenv("OTEL_EXPORTER_OTLP_METRICS_INSECURE", "bleargh")
+	setenv("OTEL_EXPORTER_OTLP_METRICS_INSECURE", "bleargh")
 
 	logger := &testLogger{}
 	shutdown, _ := ConfigureOpenTelemetry(
@@ -211,7 +213,7 @@ func TestInvalidEnvironment(t *testing.T) {
 }
 
 func TestInvalidMetricsPushIntervalEnv(t *testing.T) {
-	os.Setenv("OTEL_EXPORTER_OTLP_METRICS_PERIOD", "300million")
+	setenv("OTEL_EXPORTER_OTLP_METRICS_PERIOD", "300million")
 
 	logger := &testLogger{}
 	shutdown, _ := ConfigureOpenTelemetry(
@@ -506,7 +508,7 @@ func host() string {
 }
 
 func TestConfigureResourcesAttributes(t *testing.T) {
-	os.Setenv("OTEL_RESOURCE_ATTRIBUTES", "label1=value1,label2=value2")
+	setenv("OTEL_RESOURCE_ATTRIBUTES", "label1=value1,label2=value2")
 	config := Config{
 		ServiceName:    "test-service",
 		ServiceVersion: "test-version",
@@ -524,7 +526,7 @@ func TestConfigureResourcesAttributes(t *testing.T) {
 	}
 	assert.Equal(t, expected, resource.Attributes())
 
-	os.Setenv("OTEL_RESOURCE_ATTRIBUTES", "telemetry.sdk.language=test-language")
+	setenv("OTEL_RESOURCE_ATTRIBUTES", "telemetry.sdk.language=test-language")
 	config = Config{
 		ServiceName:    "test-service",
 		ServiceVersion: "test-version",
@@ -540,7 +542,7 @@ func TestConfigureResourcesAttributes(t *testing.T) {
 	}
 	assert.Equal(t, expected, resource.Attributes())
 
-	os.Setenv("OTEL_RESOURCE_ATTRIBUTES", "service.name=test-service-b,host.name=host123")
+	setenv("OTEL_RESOURCE_ATTRIBUTES", "service.name=test-service-b,host.name=host123")
 	config = Config{
 		ServiceName:    "test-service-b",
 		ServiceVersion: "test-version",
@@ -561,7 +563,7 @@ func TestServiceNameViaResourceAttributes(t *testing.T) {
 	stopper := dummyGRPCListener()
 	defer stopper()
 
-	os.Setenv("OTEL_RESOURCE_ATTRIBUTES", "service.name=test-service-b")
+	setenv("OTEL_RESOURCE_ATTRIBUTES", "service.name=test-service-b")
 	logger := &testLogger{}
 	shutdown, _ := ConfigureOpenTelemetry(
 		WithLogger(logger),
@@ -577,7 +579,7 @@ func TestEmptyHostnameDefaultsToOsHostname(t *testing.T) {
 	stopper := dummyGRPCListener()
 	defer stopper()
 
-	os.Setenv("OTEL_RESOURCE_ATTRIBUTES", "host.name=")
+	setenv("OTEL_RESOURCE_ATTRIBUTES", "host.name=")
 	shutdown, _ := ConfigureOpenTelemetry(
 		WithServiceName("test-service"),
 		WithSpanExporterEndpoint("localhost:443"),
@@ -624,17 +626,22 @@ func TestConfigWithResourceAttributes(t *testing.T) {
 	defer shutdown()
 }
 
+// this is to stop the linter from complaining
+func setenv(key string, value string) {
+	_ = os.Setenv(key, value)
+}
+
 func setEnvironment() {
-	os.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "satellite-url")
-	os.Setenv("OTEL_EXPORTER_OTLP_TRACES_INSECURE", "true")
-	os.Setenv("OTEL_SERVICE_NAME", "test-service-name")
-	os.Setenv("OTEL_SERVICE_VERSION", "test-service-version")
-	os.Setenv("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT", "metrics-url")
-	os.Setenv("OTEL_EXPORTER_OTLP_METRICS_INSECURE", "true")
-	os.Setenv("OTEL_METRICS_ENABLED", "false")
-	os.Setenv("OTEL_LOG_LEVEL", "debug")
-	os.Setenv("OTEL_PROPAGATORS", "b3,w3c")
-	os.Setenv("OTEL_RESOURCE_ATTRIBUTES", "service.name=test-service-name-b")
+	setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "satellite-url")
+	setenv("OTEL_EXPORTER_OTLP_TRACES_INSECURE", "true")
+	setenv("OTEL_SERVICE_NAME", "test-service-name")
+	setenv("OTEL_SERVICE_VERSION", "test-service-version")
+	setenv("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT", "metrics-url")
+	setenv("OTEL_EXPORTER_OTLP_METRICS_INSECURE", "true")
+	setenv("OTEL_METRICS_ENABLED", "false")
+	setenv("OTEL_LOG_LEVEL", "debug")
+	setenv("OTEL_PROPAGATORS", "b3,w3c")
+	setenv("OTEL_RESOURCE_ATTRIBUTES", "service.name=test-service-name-b")
 }
 
 func unsetEnvironment() {
@@ -652,7 +659,7 @@ func unsetEnvironment() {
 		"OTEL_METRICS_ENABLED",
 	}
 	for _, envvar := range vars {
-		os.Unsetenv(envvar)
+		_ = os.Unsetenv(envvar)
 	}
 }
 

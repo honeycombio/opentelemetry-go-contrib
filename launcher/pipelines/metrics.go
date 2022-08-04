@@ -77,6 +77,7 @@ func NewMetricsPipeline(c PipelineConfig) (func() error, error) {
 	}, nil
 }
 
+//revive:disable:flag-parameter internal function
 func newMetricsExporter(endpoint string, insecure bool, headers map[string]string) (*otlpmetric.Exporter, error) {
 	secureOption := otlpmetricgrpc.WithTLSCredentials(credentials.NewClientTLSFromCert(nil, ""))
 	if insecure {

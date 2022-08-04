@@ -33,9 +33,11 @@ import (
 )
 
 var (
+	// SetVendorOptions provides a way for a vendor to add a set of Options that are automatically applied.
 	SetVendorOptions func() []Option
-	ValidateConfig   func(*Config) error
-	defaultLogger    Logger = &DefaultLogger{}
+	// ValidateConfig is a function that a vendor can implement to provide additional validation after
+	// a configuration is built.
+	ValidateConfig func(*Config) error
 )
 
 type Option func(*Config)
@@ -166,6 +168,7 @@ func WithShutdown(f func(c *Config) error) Option {
 	}
 }
 
+// Logger is an interface for a logger that can be passed to WithLogger.
 type Logger interface {
 	Fatalf(format string, v ...interface{})
 	Debugf(format string, v ...interface{})
@@ -176,22 +179,25 @@ func WithLogger(logger Logger) Option {
 	// we need to cache a copy of the logger in a package variable so that newConfig can use it
 	// before we ever call the function returned by WithLogger. This is slightly messy, but
 	// consistent with expected behavior of autoinstrumentation.
-	defaultLogger = logger
+	defLogger = logger
 	return func(c *Config) {
 		c.Logger = logger
 	}
 }
 
-type DefaultLogger struct {
+type defaultLogger struct {
 }
 
-func (l *DefaultLogger) Fatalf(format string, v ...interface{}) {
+func (l *defaultLogger) Fatalf(format string, v ...interface{}) {
+	//revive:disable:deep-exit needed for default logger
 	log.Fatalf(format, v...)
 }
 
-func (l *DefaultLogger) Debugf(format string, v ...interface{}) {
+func (l *defaultLogger) Debugf(format string, v ...interface{}) {
 	log.Printf(format, v...)
 }
+
+var defLogger Logger = &defaultLogger{}
 
 type defaultHandler struct {
 	logger Logger
@@ -201,6 +207,7 @@ func (l *defaultHandler) Handle(err error) {
 	l.logger.Debugf("error: %v\n", err)
 }
 
+// Config is a configuration object; it is public so that it can be manipulated by vendors.
 type Config struct {
 	TracesExporterEndpoint          string   `env:"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,default=localhost:4317"`
 	TracesExporterEndpointInsecure  bool     `env:"OTEL_EXPORTER_OTLP_TRACES_INSECURE,default=false"`
@@ -228,8 +235,8 @@ func newConfig(opts ...Option) *Config {
 	c := &Config{
 		Headers:            map[string]string{},
 		ResourceAttributes: map[string]string{},
-		Logger:             defaultLogger,
-		errorHandler:       &defaultHandler{logger: defaultLogger},
+		Logger:             defLogger,
+		errorHandler:       &defaultHandler{logger: defLogger},
 	}
 	envError := envconfig.Process(context.Background(), c)
 	if envError != nil {
@@ -251,6 +258,7 @@ func newConfig(opts ...Option) *Config {
 	return c
 }
 
+// Launcher is the object we're here for; it implements the initialization of Open Telemetry.
 type Launcher struct {
 	config        *Config
 	shutdownFuncs []func() error
@@ -344,6 +352,8 @@ func setupMetrics(c Config) (func() error, error) {
 	})
 }
 
+// ConfigureOpenTelemetry is a function that be called with zero or more options.
+// Options can be the basic ones above, or provided by individual vendors.
 func ConfigureOpenTelemetry(opts ...Option) (func(), error) {
 	c := newConfig(opts...)
 
@@ -382,6 +392,8 @@ func ConfigureOpenTelemetry(opts ...Option) (func(), error) {
 	return launcher.Shutdown, nil
 }
 
+// Shutdown is the function called to shut down OpenTelemetry. It invokes any registered
+// shutdown functions.
 func (ls Launcher) Shutdown() {
 	// call config shutdown functions first
 	for _, shutdown := range ls.config.ShutdownFunctions {
