@@ -29,6 +29,7 @@ import (
 	"google.golang.org/grpc/encoding/gzip"
 )
 
+// NewTracePipeline creates a new trace pipeline from a config.
 func NewTracePipeline(c PipelineConfig) (func() error, error) {
 	opts := []trace.TracerProviderOption{
 		trace.WithResource(c.Resource),
@@ -60,6 +61,7 @@ func NewTracePipeline(c PipelineConfig) (func() error, error) {
 	}, nil
 }
 
+//revive:disable:flag-parameter internal function
 func newTraceExporter(endpoint string, insecure bool, headers map[string]string) (*otlptrace.Exporter, error) {
 	secureOption := otlptracegrpc.WithTLSCredentials(credentials.NewClientTLSFromCert(nil, ""))
 	if insecure {
@@ -76,7 +78,7 @@ func newTraceExporter(endpoint string, insecure bool, headers map[string]string)
 	)
 }
 
-// configurePropagators configures B3 propagation by default
+// configurePropagators configures B3 propagation by default.
 func configurePropagators(c PipelineConfig) error {
 	propagatorsMap := map[string]propagation.TextMapPropagator{
 		"b3":           b3.New(b3.WithInjectEncoding(b3.B3MultipleHeader)),

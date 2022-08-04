@@ -20,10 +20,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"time"
 
-	// TODO: before merging, update to "go.opentelemetry.io/contrib/launcher"
+	// TODO: before merging, update to "go.opentelemetry.io/contrib/launcher".
 	"github.com/honeycombio/opentelemetry-go-contrib/launcher/pipelines"
 	"github.com/sethvargo/go-envconfig"
 	"go.opentelemetry.io/otel"
@@ -34,42 +33,46 @@ import (
 )
 
 var (
+	// SetVendorOptions provides a way for a vendor to add a set of Options that are automatically applied.
 	SetVendorOptions func() []Option
-	ValidateConfig   func(*Config) error
-	defaultLogger    Logger = &DefaultLogger{}
+	// ValidateConfig is a function that a vendor can implement to provide additional validation after
+	// a configuration is built.
+	ValidateConfig func(*Config) error
 )
 
+// Option is the type of an Option to the ConfigureOpenTelemetry function; it's a
+// function that accepts a config and modifies it.
 type Option func(*Config)
 
-// WithMetricExporterEndpoint configures the endpoint for sending metrics via OTLP
+// WithMetricExporterEndpoint configures the endpoint for sending metrics via OTLP.
 func WithMetricExporterEndpoint(url string) Option {
 	return func(c *Config) {
 		c.MetricsExporterEndpoint = url
 	}
 }
 
-// WithSpanExporterEndpoint configures the endpoint for sending traces via OTLP
+// WithSpanExporterEndpoint configures the endpoint for sending traces via OTLP.
 func WithSpanExporterEndpoint(url string) Option {
 	return func(c *Config) {
 		c.TracesExporterEndpoint = url
 	}
 }
 
-// WithServiceName configures a "service.name" resource label
+// WithServiceName configures a "service.name" resource label.
 func WithServiceName(name string) Option {
 	return func(c *Config) {
 		c.ServiceName = name
 	}
 }
 
-// WithServiceVersion configures a "service.version" resource label
+// WithServiceVersion configures a "service.version" resource label.
 func WithServiceVersion(version string) Option {
 	return func(c *Config) {
 		c.ServiceVersion = version
 	}
 }
 
-// WithHeaders configures OTLP/gRPC connection headers
+// WithHeaders configures OTLP/gRPC connection headers.
 func WithHeaders(headers map[string]string) Option {
 	return func(c *Config) {
 		if c.Headers == nil {
@@ -81,7 +84,7 @@ func WithHeaders(headers map[string]string) Option {
 	}
 }
 
-// WithLogLevel configures the logging level for OpenTelemetry
+// WithLogLevel configures the logging level for OpenTelemetry.
 func WithLogLevel(loglevel string) Option {
 	return func(c *Config) {
 		c.LogLevel = loglevel
@@ -89,7 +92,7 @@ func WithLogLevel(loglevel string) Option {
 }
 
 // WithSpanExporterInsecure permits connecting to the
-// trace endpoint without a certificate
+// trace endpoint without a certificate.
 func WithSpanExporterInsecure(insecure bool) Option {
 	return func(c *Config) {
 		c.TracesExporterEndpointInsecure = insecure
@@ -97,21 +100,24 @@ func WithSpanExporterInsecure(insecure bool) Option {
 }
 
 // WithMetricExporterInsecure permits connecting to the
-// metric endpoint without a certificate
+// metric endpoint without a certificate.
 func WithMetricExporterInsecure(insecure bool) Option {
 	return func(c *Config) {
 		c.MetricsExporterEndpointInsecure = insecure
 	}
 }
 
-// WithResourceAttributes configures attributes on the resource
+// WithResourceAttributes configures attributes on the resource; if the resource
+// already exists, it sets additional attributes or overwrites those already there.
 func WithResourceAttributes(attributes map[string]string) Option {
 	return func(c *Config) {
-		c.ResourceAttributes = attributes
+		for k, v := range attributes {
+			c.ResourceAttributes[k] = v
+		}
 	}
 }
 
-// WithPropagators configures propagators
+// WithPropagators configures propagators.
 func WithPropagators(propagators []string) Option {
 	return func(c *Config) {
 		c.Propagators = propagators
@@ -119,7 +125,7 @@ func WithPropagators(propagators []string) Option {
 }
 
 // Configures a global error handler to be used throughout an OpenTelemetry instrumented project.
-// See "go.opentelemetry.io/otel"
+// See "go.opentelemetry.io/otel".
 func WithErrorHandler(handler otel.ErrorHandler) Option {
 	return func(c *Config) {
 		c.errorHandler = handler
@@ -134,21 +140,21 @@ func WithMetricReportingPeriod(p time.Duration) Option {
 	}
 }
 
-// WithMetricEnabled configures whether metrics should be enabled
+// WithMetricEnabled configures whether metrics should be enabled.
 func WithMetricsEnabled(enabled bool) Option {
 	return func(c *Config) {
 		c.MetricsEnabled = enabled
 	}
 }
 
-// WithTracesEnabled configures whether traces should be enabled
+// WithTracesEnabled configures whether traces should be enabled.
 func WithTracesEnabled(enabled bool) Option {
 	return func(c *Config) {
 		c.TracesEnabled = enabled
 	}
 }
 
-// WithSpanProcessor adds one or more SpanProcessors
+// WithSpanProcessor adds one or more SpanProcessors.
 func WithSpanProcessor(sp ...trace.SpanProcessor) Option {
 	return func(c *Config) {
 		c.SpanProcessors = append(c.SpanProcessors, sp...)
@@ -164,32 +170,37 @@ func WithShutdown(f func(c *Config) error) Option {
 	}
 }
 
+// Logger is an interface for a logger that can be passed to WithLogger.
 type Logger interface {
 	Fatalf(format string, v ...interface{})
 	Debugf(format string, v ...interface{})
 }
 
+// WithLogger sets up the logger to be used by the launcher.
 func WithLogger(logger Logger) Option {
 	// In order to enable the environment parsing to send an error to the specified logger
 	// we need to cache a copy of the logger in a package variable so that newConfig can use it
 	// before we ever call the function returned by WithLogger. This is slightly messy, but
 	// consistent with expected behavior of autoinstrumentation.
-	defaultLogger = logger
+	defLogger = logger
 	return func(c *Config) {
 		c.Logger = logger
 	}
 }
 
-type DefaultLogger struct {
+type defaultLogger struct {
 }
 
-func (l *DefaultLogger) Fatalf(format string, v ...interface{}) {
+func (l *defaultLogger) Fatalf(format string, v ...interface{}) {
+	//revive:disable:deep-exit needed for default logger
 	log.Fatalf(format, v...)
 }
 
-func (l *DefaultLogger) Debugf(format string, v ...interface{}) {
+func (l *defaultLogger) Debugf(format string, v ...interface{}) {
 	log.Printf(format, v...)
 }
+
+var defLogger Logger = &defaultLogger{}
 
 type defaultHandler struct {
 	logger Logger
@@ -199,36 +210,36 @@ func (l *defaultHandler) Handle(err error) {
 	l.logger.Debugf("error: %v\n", err)
 }
 
+// Config is a configuration object; it is public so that it can be manipulated by vendors.
 type Config struct {
-	TracesExporterEndpoint          string `env:"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,default=localhost:4317"`
-	TracesExporterEndpointInsecure  bool   `env:"OTEL_EXPORTER_OTLP_TRACES_INSECURE,default=false"`
-	TracesEnabled                   bool   `env:"OTEL_TRACES_ENABLED,default=true"`
-	ServiceName                     string `env:"OTEL_SERVICE_NAME"`
-	ServiceVersion                  string `env:"OTEL_SERVICE_VERSION"`
-	Headers                         map[string]string
-	HeadersFromEnv                  string   `env:"OTEL_EXPORTER_OTLP_HEADERS"`
+	TracesExporterEndpoint          string   `env:"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,default=localhost:4317"`
+	TracesExporterEndpointInsecure  bool     `env:"OTEL_EXPORTER_OTLP_TRACES_INSECURE,default=false"`
+	TracesEnabled                   bool     `env:"OTEL_TRACES_ENABLED,default=true"`
+	ServiceName                     string   `env:"OTEL_SERVICE_NAME"`
+	ServiceVersion                  string   `env:"OTEL_SERVICE_VERSION,default=unknown"`
 	MetricsExporterEndpoint         string   `env:"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,default=localhost:4317"`
 	MetricsExporterEndpointInsecure bool     `env:"OTEL_EXPORTER_OTLP_METRICS_INSECURE,default=false"`
 	MetricsEnabled                  bool     `env:"OTEL_METRICS_ENABLED,default=true"`
 	MetricsReportingPeriod          string   `env:"OTEL_EXPORTER_OTLP_METRICS_PERIOD,default=30s"`
 	LogLevel                        string   `env:"OTEL_LOG_LEVEL,default=info"`
 	Propagators                     []string `env:"OTEL_PROPAGATORS,default=tracecontext,baggage"`
+	HeadersFromEnv                  string   `env:"OTEL_EXPORTER_OTLP_HEADERS"`
+	ResourceAttributesFromEnv       string   `env:"OTEL_RESOURCE_ATTRIBUTES"`
+	Headers                         map[string]string
 	ResourceAttributes              map[string]string
-	ResourceAttributesFromEnv       string `env:"OTEL_RESOURCE_ATTRIBUTES"`
-
-	SpanProcessors    []trace.SpanProcessor
-	Resource          *resource.Resource
-	Logger            Logger
-	ShutdownFunctions []func(c *Config) error
-	errorHandler      otel.ErrorHandler
+	SpanProcessors                  []trace.SpanProcessor
+	Resource                        *resource.Resource
+	Logger                          Logger
+	ShutdownFunctions               []func(c *Config) error
+	errorHandler                    otel.ErrorHandler
 }
 
 func newConfig(opts ...Option) *Config {
 	c := &Config{
 		Headers:            map[string]string{},
 		ResourceAttributes: map[string]string{},
-		Logger:             defaultLogger,
-		errorHandler:       &defaultHandler{logger: defaultLogger},
+		Logger:             defLogger,
+		errorHandler:       &defaultHandler{logger: defLogger},
 	}
 	envError := envconfig.Process(context.Background(), c)
 	if envError != nil {
@@ -246,50 +257,19 @@ func newConfig(opts ...Option) *Config {
 		opt(c)
 	}
 
-	if len(c.HeadersFromEnv) > 0 {
-		c.Headers = getHeadersFromEnv(c)
-	}
 	c.Resource = newResource(c)
 	return c
 }
 
+// Launcher is the object we're here for; it implements the initialization of Open Telemetry.
 type Launcher struct {
 	config        *Config
 	shutdownFuncs []func() error
 }
 
-// these are set as key=value, not key:value
-func getHeadersFromEnv(c *Config) map[string]string {
-	if c.HeadersFromEnv == "" {
-		return nil
-	}
-	HeadersFromEnv := strings.Split(c.HeadersFromEnv, ",")
-	mapHeaders := make(map[string]string)
-	for _, e := range HeadersFromEnv {
-		headers := strings.Split(e, "=")
-		mapHeaders[headers[0]] = headers[1]
-	}
-	return mapHeaders
-}
-
-// these are set as key=value, not key:value
-func getResourceAttrsFromEnv(c *Config) map[string]string {
-	if c.ResourceAttributesFromEnv == "" {
-		return nil
-	}
-	ResourceAttrsFromEnv := strings.Split(c.ResourceAttributesFromEnv, ",")
-	mapResourceAttrs := make(map[string]string)
-	for _, e := range ResourceAttrsFromEnv {
-		resourceAttrs := strings.Split(e, "=")
-		mapResourceAttrs[resourceAttrs[0]] = resourceAttrs[1]
-	}
-	return mapResourceAttrs
-}
-
 func newResource(c *Config) *resource.Resource {
 	r := resource.Environment()
 
-	c.ResourceAttributes = getResourceAttrsFromEnv(c)
 	hostnameSet := false
 	for iter := r.Iter(); iter.Next(); {
 		if iter.Attribute().Key == semconv.HostNameKey && len(iter.Attribute().Value.Emit()) > 0 {
@@ -375,6 +355,8 @@ func setupMetrics(c Config) (func() error, error) {
 	})
 }
 
+// ConfigureOpenTelemetry is a function that be called with zero or more options.
+// Options can be the basic ones above, or provided by individual vendors.
 func ConfigureOpenTelemetry(opts ...Option) (func(), error) {
 	c := newConfig(opts...)
 
@@ -413,6 +395,8 @@ func ConfigureOpenTelemetry(opts ...Option) (func(), error) {
 	return launcher.Shutdown, nil
 }
 
+// Shutdown is the function called to shut down OpenTelemetry. It invokes any registered
+// shutdown functions.
 func (ls Launcher) Shutdown() {
 	// call config shutdown functions first
 	for _, shutdown := range ls.config.ShutdownFunctions {

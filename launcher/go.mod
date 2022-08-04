@@ -1,7 +1,7 @@
 // TODO: before merging, change module to "go.opentelemetry.io/contrib/launcher"
 module github.com/honeycombio/opentelemetry-go-contrib/launcher
 
-go 1.18
+go 1.17
 
 require (
 	github.com/sethvargo/go-envconfig v0.6.2
@@ -18,7 +18,8 @@ require (
 	go.opentelemetry.io/otel/metric v0.31.0
 	go.opentelemetry.io/otel/sdk v1.8.0
 	go.opentelemetry.io/otel/sdk/metric v0.31.0
-	google.golang.org/grpc v1.46.2
+	go.opentelemetry.io/proto/otlp v0.18.0
+	google.golang.org/grpc v1.47.0
 )
 
 require (
@@ -39,7 +40,6 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.8.0 // indirect
 	go.opentelemetry.io/otel/trace v1.8.0 // indirect
-	go.opentelemetry.io/proto/otlp v0.18.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/net v0.0.0-20220111093109-d55c255bac03 // indirect
@@ -47,5 +47,6 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20220112215332-a9c7c0acf9f2 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
+	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

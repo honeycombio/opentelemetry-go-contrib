@@ -17,6 +17,7 @@ package launcher
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 	"testing"
@@ -28,7 +29,12 @@ import (
 	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.10.0"
+	collectormetrics "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
+	collectortrace "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	"google.golang.org/grpc"
 )
+
+//revive:disable:import-shadowing this is a test file
 
 const (
 	expectedTracingDisabledMessage = "tracing is disabled by configuration: no endpoint set"
@@ -72,8 +78,57 @@ func (logger *testLogger) requireNotContains(t *testing.T, expected string) {
 	}
 }
 
-func (logger *testLogger) reset() {
-	logger.output = nil
+// Create some dummy server implementations so that we can
+// spin up tests that don't need to wait for a timeout trying to send data.
+type dummyTraceServer struct {
+	collectortrace.UnimplementedTraceServiceServer
+}
+
+func (*dummyTraceServer) Export(ctx context.Context, req *collectortrace.ExportTraceServiceRequest) (*collectortrace.ExportTraceServiceResponse, error) {
+	return &collectortrace.ExportTraceServiceResponse{}, nil
+}
+
+type dummyMetricsServer struct {
+	collectormetrics.UnimplementedMetricsServiceServer
+}
+
+func (*dummyMetricsServer) Export(ctx context.Context, req *collectormetrics.ExportMetricsServiceRequest) (*collectormetrics.ExportMetricsServiceResponse, error) {
+	return &collectormetrics.ExportMetricsServiceResponse{}, nil
+}
+
+// dummyGRPCListener is a test helper that builds a dummy grpc server that does nothing but
+// returns quickly so that we don't have to wait for timeouts.
+func dummyGRPCListener() func() {
+	grpcServer := grpc.NewServer()
+	collectortrace.RegisterTraceServiceServer(grpcServer, &dummyTraceServer{})
+	collectormetrics.RegisterMetricsServiceServer(grpcServer, &dummyMetricsServer{})
+
+	// we listen on localhost, not 0.0.0.0, because otherwise firewalls can get upset
+	// and get in the way of testing.
+	l, err := net.Listen("tcp", net.JoinHostPort("localhost", "4317"))
+	if err != nil {
+		panic("oops - dummyGrpcListener failed to start up!")
+	}
+	go func() {
+		_ = grpcServer.Serve(l)
+	}()
+	return grpcServer.Stop
+}
+
+// withTestExporters conforms to the Option interface and sets up the options needed
+// to prevent a test from having to time out. It won't work unless the test also does this:
+//
+// stopper := dummyGRPCListener()
+// defer stopper()
+//
+// This is a convenience function.
+func withTestExporters() Option {
+	return func(c *Config) {
+		WithSpanExporterEndpoint("localhost:4317")(c)
+		WithSpanExporterInsecure(true)(c)
+		WithMetricExporterEndpoint("localhost:4317")(c)
+		WithMetricExporterInsecure(true)(c)
+	}
 }
 
 type testErrorHandler struct {
@@ -125,20 +180,18 @@ func TestMetricEndpointDisabled(t *testing.T) {
 
 func TestValidConfig(t *testing.T) {
 	logger := &testLogger{}
+
+	// in order for tests to not have to timeout during
+	// the shutdown call, we must direct them to a running
+	// server, which means that it has to go to localhost:4317,
+	// and it must be Insecure.
+	stopper := dummyGRPCListener()
+	defer stopper()
+
 	shutdown, _ := ConfigureOpenTelemetry(
 		WithLogger(logger),
 		WithServiceName("test-service"),
-		WithErrorHandler(&testErrorHandler{}),
-	)
-	defer shutdown()
-
-	logger.reset()
-
-	shutdown, _ = ConfigureOpenTelemetry(
-		WithLogger(logger),
-		WithServiceName("test-service"),
-		WithMetricExporterEndpoint("localhost:443"),
-		WithSpanExporterEndpoint("localhost:443"),
+		withTestExporters(),
 	)
 	defer shutdown()
 
@@ -148,7 +201,7 @@ func TestValidConfig(t *testing.T) {
 }
 
 func TestInvalidEnvironment(t *testing.T) {
-	os.Setenv("OTEL_EXPORTER_OTLP_METRICS_INSECURE", "bleargh")
+	setenv("OTEL_EXPORTER_OTLP_METRICS_INSECURE", "bleargh")
 
 	logger := &testLogger{}
 	shutdown, _ := ConfigureOpenTelemetry(
@@ -162,14 +215,13 @@ func TestInvalidEnvironment(t *testing.T) {
 }
 
 func TestInvalidMetricsPushIntervalEnv(t *testing.T) {
-	os.Setenv("OTEL_EXPORTER_OTLP_METRICS_PERIOD", "300million")
+	setenv("OTEL_EXPORTER_OTLP_METRICS_PERIOD", "300million")
 
 	logger := &testLogger{}
 	shutdown, _ := ConfigureOpenTelemetry(
 		WithLogger(logger),
 		WithServiceName("test-service"),
-		WithSpanExporterEndpoint("127.0.0.1:4000"),
-		WithMetricExporterEndpoint("127.0.0.1:4000"),
+		withTestExporters(),
 	)
 	defer shutdown()
 
@@ -182,9 +234,8 @@ func TestInvalidMetricsPushIntervalConfig(t *testing.T) {
 	shutdown, _ := ConfigureOpenTelemetry(
 		WithLogger(logger),
 		WithServiceName("test-service"),
-		WithSpanExporterEndpoint("127.0.0.1:4000"),
-		WithMetricExporterEndpoint("127.0.0.1:4000"),
 		WithMetricReportingPeriod(-time.Second),
+		withTestExporters(),
 	)
 	defer shutdown()
 
@@ -194,10 +245,13 @@ func TestInvalidMetricsPushIntervalConfig(t *testing.T) {
 
 func TestDebugEnabled(t *testing.T) {
 	logger := &testLogger{}
+	stopper := dummyGRPCListener()
+	defer stopper()
+
 	shutdown, _ := ConfigureOpenTelemetry(
 		WithLogger(logger),
 		WithServiceName("test-service"),
-		WithSpanExporterEndpoint("localhost:443"),
+		withTestExporters(),
 		WithLogLevel("debug"),
 		WithResourceAttributes(map[string]string{
 			"attr1":     "val1",
@@ -208,14 +262,13 @@ func TestDebugEnabled(t *testing.T) {
 	output := strings.Join(logger.output[:], ",")
 	assert.Contains(t, output, "debug logging enabled")
 	assert.Contains(t, output, "test-service")
-	assert.Contains(t, output, "localhost:443")
+	assert.Contains(t, output, "localhost:4317")
 	assert.Contains(t, output, "attr1")
 	assert.Contains(t, output, "val1")
 	assert.Contains(t, output, "host.name")
 	assert.Contains(t, output, "host456")
 }
 
-// TODO Review test - service version funky
 func TestDefaultConfig(t *testing.T) {
 	logger := &testLogger{}
 	handler := &testErrorHandler{}
@@ -232,7 +285,7 @@ func TestDefaultConfig(t *testing.T) {
 		attribute.String("telemetry.sdk.version", version),
 	}
 
-	expected := Config{
+	expected := &Config{
 		TracesExporterEndpoint:          "localhost:4317",
 		TracesExporterEndpointInsecure:  false,
 		TracesEnabled:                   true,
@@ -243,6 +296,8 @@ func TestDefaultConfig(t *testing.T) {
 		MetricsEnabled:                  true,
 		MetricsReportingPeriod:          "30s",
 		LogLevel:                        "info",
+		Headers:                         map[string]string{},
+		ResourceAttributes:              map[string]string{},
 		Propagators:                     []string{"tracecontext", "baggage"},
 		Resource:                        resource.NewWithAttributes(semconv.SchemaURL, attributes...),
 		Logger:                          logger,
@@ -269,7 +324,7 @@ func TestEnvironmentVariables(t *testing.T) {
 		attribute.String("telemetry.sdk.version", version),
 	}
 
-	expected := Config{
+	expected := &Config{
 		TracesExporterEndpoint:          "satellite-url",
 		TracesExporterEndpointInsecure:  true,
 		TracesEnabled:                   true,
@@ -280,13 +335,16 @@ func TestEnvironmentVariables(t *testing.T) {
 		MetricsEnabled:                  false,
 		MetricsReportingPeriod:          "30s",
 		LogLevel:                        "debug",
+		Headers:                         map[string]string{},
+		ResourceAttributes:              map[string]string{},
+		ResourceAttributesFromEnv:       "service.name=test-service-name-b",
 		Propagators:                     []string{"b3", "w3c"},
 		Resource:                        resource.NewWithAttributes(semconv.SchemaURL, attributes...),
 		Logger:                          logger,
 		errorHandler:                    handler,
 	}
 	assert.Equal(t, expected, config)
-
+	unsetEnvironment()
 }
 
 func TestConfigurationOverrides(t *testing.T) {
@@ -315,21 +373,26 @@ func TestConfigurationOverrides(t *testing.T) {
 		attribute.String("telemetry.sdk.version", version),
 	}
 
-	expected := Config{
+	expected := &Config{
 		ServiceName:                     "override-service-name",
 		ServiceVersion:                  "override-service-version",
 		TracesExporterEndpoint:          "override-satellite-url",
 		TracesExporterEndpointInsecure:  false,
+		TracesEnabled:                   true,
 		MetricsExporterEndpoint:         "override-metrics-url",
 		MetricsExporterEndpointInsecure: false,
 		MetricsReportingPeriod:          "30s",
 		LogLevel:                        "info",
+		Headers:                         map[string]string{},
+		ResourceAttributes:              map[string]string{},
+		ResourceAttributesFromEnv:       "service.name=test-service-name-b",
 		Propagators:                     []string{"b3"},
 		Resource:                        resource.NewWithAttributes(semconv.SchemaURL, attributes...),
 		Logger:                          logger,
 		errorHandler:                    handler,
 	}
 	assert.Equal(t, expected, config)
+	unsetEnvironment()
 }
 
 type TestCarrier struct {
@@ -352,7 +415,10 @@ func (t TestCarrier) Set(key string, value string) {
 	t.values[key] = value
 }
 
-func TestConfigurePropagators(t *testing.T) {
+func TestConfigurePropagators1(t *testing.T) {
+	stopper := dummyGRPCListener()
+	defer stopper()
+
 	mem1, _ := baggage.NewMember("keyone", "foo1")
 	mem2, _ := baggage.NewMember("keytwo", "bar1")
 	bag, _ := baggage.New(mem1, mem2)
@@ -361,44 +427,73 @@ func TestConfigurePropagators(t *testing.T) {
 
 	unsetEnvironment()
 	logger := &testLogger{}
-	shutdown, _ := ConfigureOpenTelemetry(
+	shutdown, err := ConfigureOpenTelemetry(
 		WithLogger(logger),
 		WithServiceName("test-service"),
-		WithSpanExporterEndpoint("localhost:443"),
+		withTestExporters(),
 	)
+	assert.NoError(t, err)
 	defer shutdown()
-	ctx, finish := otel.Tracer("ex.com/basic").Start(ctx, "foo")
+
+	ctx, finish := otel.Tracer("sampletracer").Start(ctx, "foo")
 	defer finish.End()
+
+	carrier := TestCarrier{values: map[string]string{}}
+	prop := otel.GetTextMapPropagator()
+	prop.Inject(ctx, carrier)
+	baggage := carrier.Get("baggage")
+	assert.Contains(t, baggage, "keyone=foo1")
+	assert.Contains(t, baggage, "keytwo=bar1")
+	assert.Greater(t, len(carrier.Get("traceparent")), 0)
+}
+
+func TestConfigurePropagators2(t *testing.T) {
+	stopper := dummyGRPCListener()
+	defer stopper()
+
+	mem1, _ := baggage.NewMember("keyone", "foo1")
+	mem2, _ := baggage.NewMember("keytwo", "bar1")
+	bag, _ := baggage.New(mem1, mem2)
+
+	ctx := baggage.ContextWithBaggage(context.Background(), bag)
+
+	unsetEnvironment()
+	logger := &testLogger{}
+	shutdown, err := ConfigureOpenTelemetry(
+		WithLogger(logger),
+		WithServiceName("test-service"),
+		WithPropagators([]string{"b3", "baggage", "tracecontext"}),
+		withTestExporters(),
+	)
+	assert.NoError(t, err)
+	defer shutdown()
+
+	ctx, finish := otel.Tracer("sampletracer").Start(ctx, "foo")
+	defer finish.End()
+
 	carrier := TestCarrier{values: map[string]string{}}
 	prop := otel.GetTextMapPropagator()
 	prop.Inject(ctx, carrier)
 	assert.Greater(t, len(carrier.Get("x-b3-traceid")), 0)
-	assert.Equal(t, "", carrier.Get("baggage"))
-	assert.Equal(t, len(carrier.Get("traceparent")), 0)
-
-	shutdown, _ = ConfigureOpenTelemetry(
-		WithLogger(logger),
-		WithServiceName("test-service"),
-		WithSpanExporterEndpoint("localhost:443"),
-		WithPropagators([]string{"b3", "baggage", "tracecontext"}),
-	)
-	defer shutdown()
-	carrier = TestCarrier{values: map[string]string{}}
-	prop = otel.GetTextMapPropagator()
-	prop.Inject(ctx, carrier)
-	assert.Greater(t, len(carrier.Get("x-b3-traceid")), 0)
-	assert.Contains(t, carrier.Get("baggage"), "keytwo=bar1")
-	assert.Contains(t, carrier.Get("baggage"), "keyone=foo1")
+	baggage := carrier.Get("baggage")
+	assert.Contains(t, baggage, "keyone=foo1")
+	assert.Contains(t, baggage, "keytwo=bar1")
 	assert.Greater(t, len(carrier.Get("traceparent")), 0)
+}
 
-	logger = &testLogger{}
-	shutdown, _ = ConfigureOpenTelemetry(
+func TestConfigurePropagators3(t *testing.T) {
+	stopper := dummyGRPCListener()
+	defer stopper()
+
+	unsetEnvironment()
+	logger := &testLogger{}
+	shutdown, err := ConfigureOpenTelemetry(
 		WithLogger(logger),
 		WithServiceName("test-service"),
-		WithSpanExporterEndpoint("localhost:443"),
 		WithPropagators([]string{"invalid"}),
-		WithMetricExporterEndpoint("localhost:443"),
+		withTestExporters(),
 	)
+	assert.NoError(t, err)
 	defer shutdown()
 
 	expected := "invalid configuration: unsupported propagators. Supported options: b3,baggage,tracecontext,ottrace"
@@ -413,7 +508,7 @@ func host() string {
 }
 
 func TestConfigureResourcesAttributes(t *testing.T) {
-	os.Setenv("OTEL_RESOURCE_ATTRIBUTES", "label1=value1,label2=value2")
+	setenv("OTEL_RESOURCE_ATTRIBUTES", "label1=value1,label2=value2")
 	config := Config{
 		ServiceName:    "test-service",
 		ServiceVersion: "test-version",
@@ -431,7 +526,7 @@ func TestConfigureResourcesAttributes(t *testing.T) {
 	}
 	assert.Equal(t, expected, resource.Attributes())
 
-	os.Setenv("OTEL_RESOURCE_ATTRIBUTES", "telemetry.sdk.language=test-language")
+	setenv("OTEL_RESOURCE_ATTRIBUTES", "telemetry.sdk.language=test-language")
 	config = Config{
 		ServiceName:    "test-service",
 		ServiceVersion: "test-version",
@@ -447,7 +542,7 @@ func TestConfigureResourcesAttributes(t *testing.T) {
 	}
 	assert.Equal(t, expected, resource.Attributes())
 
-	os.Setenv("OTEL_RESOURCE_ATTRIBUTES", "service.name=test-service-b,host.name=host123")
+	setenv("OTEL_RESOURCE_ATTRIBUTES", "service.name=test-service-b,host.name=host123")
 	config = Config{
 		ServiceName:    "test-service-b",
 		ServiceVersion: "test-version",
@@ -465,19 +560,26 @@ func TestConfigureResourcesAttributes(t *testing.T) {
 }
 
 func TestServiceNameViaResourceAttributes(t *testing.T) {
-	os.Setenv("OTEL_RESOURCE_ATTRIBUTES", "service.name=test-service-b")
+	stopper := dummyGRPCListener()
+	defer stopper()
+
+	setenv("OTEL_RESOURCE_ATTRIBUTES", "service.name=test-service-b")
 	logger := &testLogger{}
-	shutdown, _ := ConfigureOpenTelemetry(WithLogger(logger))
+	shutdown, _ := ConfigureOpenTelemetry(
+		WithLogger(logger),
+		withTestExporters(),
+	)
 	defer shutdown()
 
-	expected := "invalid configuration: service name missing"
-	if strings.Contains(logger.output[0], expected) {
-		t.Errorf("\nString found: %v\nIn: %v", expected, logger.output[0])
-	}
+	notExpected := "invalid configuration: service name missing"
+	logger.requireNotContains(t, notExpected)
 }
 
 func TestEmptyHostnameDefaultsToOsHostname(t *testing.T) {
-	os.Setenv("OTEL_RESOURCE_ATTRIBUTES", "host.name=")
+	stopper := dummyGRPCListener()
+	defer stopper()
+
+	setenv("OTEL_RESOURCE_ATTRIBUTES", "host.name=")
 	shutdown, _ := ConfigureOpenTelemetry(
 		WithServiceName("test-service"),
 		WithSpanExporterEndpoint("localhost:443"),
@@ -492,11 +594,15 @@ func TestEmptyHostnameDefaultsToOsHostname(t *testing.T) {
 			assert.True(t, ok)
 			return nil
 		}),
+		withTestExporters(),
 	)
 	defer shutdown()
 }
 
 func TestConfigWithResourceAttributes(t *testing.T) {
+	stopper := dummyGRPCListener()
+	defer stopper()
+
 	shutdown, _ := ConfigureOpenTelemetry(
 		WithServiceName("test-service"),
 		WithSpanExporterEndpoint("localhost:443"),
@@ -515,21 +621,27 @@ func TestConfigWithResourceAttributes(t *testing.T) {
 			assert.True(t, ok)
 			return nil
 		}),
+		withTestExporters(),
 	)
 	defer shutdown()
 }
 
+// setenv is to stop the linter from complaining.
+func setenv(key string, value string) {
+	_ = os.Setenv(key, value)
+}
+
 func setEnvironment() {
-	os.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "satellite-url")
-	os.Setenv("OTEL_EXPORTER_OTLP_TRACES_INSECURE", "true")
-	os.Setenv("OTEL_SERVICE_NAME", "test-service-name")
-	os.Setenv("OTEL_SERVICE_VERSION", "test-service-version")
-	os.Setenv("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT", "metrics-url")
-	os.Setenv("OTEL_EXPORTER_OTLP_METRICS_INSECURE", "true")
-	os.Setenv("OTEL_METRICS_ENABLED", "false")
-	os.Setenv("OTEL_LOG_LEVEL", "debug")
-	os.Setenv("OTEL_PROPAGATORS", "b3,w3c")
-	os.Setenv("OTEL_RESOURCE_ATTRIBUTES", "service.name=test-service-name-b")
+	setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "satellite-url")
+	setenv("OTEL_EXPORTER_OTLP_TRACES_INSECURE", "true")
+	setenv("OTEL_SERVICE_NAME", "test-service-name")
+	setenv("OTEL_SERVICE_VERSION", "test-service-version")
+	setenv("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT", "metrics-url")
+	setenv("OTEL_EXPORTER_OTLP_METRICS_INSECURE", "true")
+	setenv("OTEL_METRICS_ENABLED", "false")
+	setenv("OTEL_LOG_LEVEL", "debug")
+	setenv("OTEL_PROPAGATORS", "b3,w3c")
+	setenv("OTEL_RESOURCE_ATTRIBUTES", "service.name=test-service-name-b")
 }
 
 func unsetEnvironment() {
@@ -547,7 +659,7 @@ func unsetEnvironment() {
 		"OTEL_METRICS_ENABLED",
 	}
 	for _, envvar := range vars {
-		os.Unsetenv(envvar)
+		_ = os.Unsetenv(envvar)
 	}
 }
 
