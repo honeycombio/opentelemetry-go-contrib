@@ -19,6 +19,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 )
 
+// PipelineConfig contains config info for a Pipeline.
 type PipelineConfig struct {
 	Endpoint        string
 	Insecure        bool

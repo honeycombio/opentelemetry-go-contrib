@@ -42,35 +42,35 @@ var (
 
 type Option func(*Config)
 
-// WithMetricExporterEndpoint configures the endpoint for sending metrics via OTLP
+// WithMetricExporterEndpoint configures the endpoint for sending metrics via OTLP.
 func WithMetricExporterEndpoint(url string) Option {
 	return func(c *Config) {
 		c.MetricsExporterEndpoint = url
 	}
 }
 
-// WithSpanExporterEndpoint configures the endpoint for sending traces via OTLP
+// WithSpanExporterEndpoint configures the endpoint for sending traces via OTLP.
 func WithSpanExporterEndpoint(url string) Option {
 	return func(c *Config) {
 		c.TracesExporterEndpoint = url
 	}
 }
 
-// WithServiceName configures a "service.name" resource label
+// WithServiceName configures a "service.name" resource label.
 func WithServiceName(name string) Option {
 	return func(c *Config) {
 		c.ServiceName = name
 	}
 }
 
-// WithServiceVersion configures a "service.version" resource label
+// WithServiceVersion configures a "service.version" resource label.
 func WithServiceVersion(version string) Option {
 	return func(c *Config) {
 		c.ServiceVersion = version
 	}
 }
 
-// WithHeaders configures OTLP/gRPC connection headers
+// WithHeaders configures OTLP/gRPC connection headers.
 func WithHeaders(headers map[string]string) Option {
 	return func(c *Config) {
 		if c.Headers == nil {
@@ -82,7 +82,7 @@ func WithHeaders(headers map[string]string) Option {
 	}
 }
 
-// WithLogLevel configures the logging level for OpenTelemetry
+// WithLogLevel configures the logging level for OpenTelemetry.
 func WithLogLevel(loglevel string) Option {
 	return func(c *Config) {
 		c.LogLevel = loglevel
@@ -90,7 +90,7 @@ func WithLogLevel(loglevel string) Option {
 }
 
 // WithSpanExporterInsecure permits connecting to the
-// trace endpoint without a certificate
+// trace endpoint without a certificate.
 func WithSpanExporterInsecure(insecure bool) Option {
 	return func(c *Config) {
 		c.TracesExporterEndpointInsecure = insecure
@@ -98,7 +98,7 @@ func WithSpanExporterInsecure(insecure bool) Option {
 }
 
 // WithMetricExporterInsecure permits connecting to the
-// metric endpoint without a certificate
+// metric endpoint without a certificate.
 func WithMetricExporterInsecure(insecure bool) Option {
 	return func(c *Config) {
 		c.MetricsExporterEndpointInsecure = insecure
@@ -115,7 +115,7 @@ func WithResourceAttributes(attributes map[string]string) Option {
 	}
 }
 
-// WithPropagators configures propagators
+// WithPropagators configures propagators.
 func WithPropagators(propagators []string) Option {
 	return func(c *Config) {
 		c.Propagators = propagators
@@ -123,7 +123,7 @@ func WithPropagators(propagators []string) Option {
 }
 
 // Configures a global error handler to be used throughout an OpenTelemetry instrumented project.
-// See "go.opentelemetry.io/otel"
+// See "go.opentelemetry.io/otel".
 func WithErrorHandler(handler otel.ErrorHandler) Option {
 	return func(c *Config) {
 		c.errorHandler = handler
@@ -138,21 +138,21 @@ func WithMetricReportingPeriod(p time.Duration) Option {
 	}
 }
 
-// WithMetricEnabled configures whether metrics should be enabled
+// WithMetricEnabled configures whether metrics should be enabled.
 func WithMetricsEnabled(enabled bool) Option {
 	return func(c *Config) {
 		c.MetricsEnabled = enabled
 	}
 }
 
-// WithTracesEnabled configures whether traces should be enabled
+// WithTracesEnabled configures whether traces should be enabled.
 func WithTracesEnabled(enabled bool) Option {
 	return func(c *Config) {
 		c.TracesEnabled = enabled
 	}
 }
 
-// WithSpanProcessor adds one or more SpanProcessors
+// WithSpanProcessor adds one or more SpanProcessors.
 func WithSpanProcessor(sp ...trace.SpanProcessor) Option {
 	return func(c *Config) {
 		c.SpanProcessors = append(c.SpanProcessors, sp...)
@@ -174,6 +174,7 @@ type Logger interface {
 	Debugf(format string, v ...interface{})
 }
 
+// WithLogger sets up the logger to be used by the launcher.
 func WithLogger(logger Logger) Option {
 	// In order to enable the environment parsing to send an error to the specified logger
 	// we need to cache a copy of the logger in a package variable so that newConfig can use it

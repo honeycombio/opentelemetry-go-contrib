@@ -110,7 +110,9 @@ func dummyGRPCListener() func() {
 	if err != nil {
 		panic("oops - dummyGrpcListener failed to start up!")
 	}
-	go grpcServer.Serve(l)
+	go func() {
+		_ = grpcServer.Serve(l)
+	}()
 	return grpcServer.Stop
 }
 
@@ -119,6 +121,8 @@ func dummyGRPCListener() func() {
 //
 // stopper := dummyGRPCListener()
 // defer stopper()
+//
+// This is a convenience function.
 func withTestExporters() Option {
 	return func(c *Config) {
 		WithSpanExporterEndpoint("localhost:4317")(c)
@@ -268,7 +272,6 @@ func TestDebugEnabled(t *testing.T) {
 	assert.Contains(t, output, "host456")
 }
 
-// TODO Review test - service version funky
 func TestDefaultConfig(t *testing.T) {
 	logger := &testLogger{}
 	handler := &testErrorHandler{}
@@ -626,7 +629,7 @@ func TestConfigWithResourceAttributes(t *testing.T) {
 	defer shutdown()
 }
 
-// this is to stop the linter from complaining
+// setenv is to stop the linter from complaining.
 func setenv(key string, value string) {
 	_ = os.Setenv(key, value)
 }

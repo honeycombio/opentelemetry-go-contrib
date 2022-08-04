@@ -31,6 +31,7 @@ import (
 	"google.golang.org/grpc/encoding/gzip"
 )
 
+// NewMetricsPipeline takes a PipelineConfig and builds a metrics pipeline.
 func NewMetricsPipeline(c PipelineConfig) (func() error, error) {
 	metricExporter, err := newMetricsExporter(c.Endpoint, c.Insecure, c.Headers)
 	if err != nil {
@@ -44,7 +45,6 @@ func NewMetricsPipeline(c PipelineConfig) (func() error, error) {
 			return nil, fmt.Errorf("invalid metric reporting period: %v", err)
 		}
 		if period <= 0 {
-
 			return nil, fmt.Errorf("invalid metric reporting period: %v", c.ReportingPeriod)
 		}
 	}
