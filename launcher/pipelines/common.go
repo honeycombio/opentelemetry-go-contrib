@@ -30,4 +30,5 @@ type PipelineConfig struct {
 	SpanProcessors  []trace.SpanProcessor
 }
 
+// PipelineSetupFunc defines the interface for a Pipeline Setup function.
 type PipelineSetupFunc func(PipelineConfig) (func() error, error)

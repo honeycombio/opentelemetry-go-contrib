@@ -22,7 +22,7 @@ import (
 	"os"
 	"time"
 
-	// TODO: before merging, update to "go.opentelemetry.io/contrib/launcher"
+	// TODO: before merging, update to "go.opentelemetry.io/contrib/launcher".
 	"github.com/honeycombio/opentelemetry-go-contrib/launcher/pipelines"
 	"github.com/sethvargo/go-envconfig"
 	"go.opentelemetry.io/otel"
@@ -40,6 +40,8 @@ var (
 	ValidateConfig func(*Config) error
 )
 
+// Option is the type of an Option to the ConfigureOpenTelemetry function; it's a
+// function that accepts a config and modifies it.
 type Option func(*Config)
 
 // WithMetricExporterEndpoint configures the endpoint for sending metrics via OTLP.

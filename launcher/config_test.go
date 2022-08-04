@@ -85,7 +85,6 @@ type dummyTraceServer struct {
 }
 
 func (*dummyTraceServer) Export(ctx context.Context, req *collectortrace.ExportTraceServiceRequest) (*collectortrace.ExportTraceServiceResponse, error) {
-	fmt.Println("inside trace export", time.Now().Format(time.RFC3339))
 	return &collectortrace.ExportTraceServiceResponse{}, nil
 }
 
@@ -94,18 +93,18 @@ type dummyMetricsServer struct {
 }
 
 func (*dummyMetricsServer) Export(ctx context.Context, req *collectormetrics.ExportMetricsServiceRequest) (*collectormetrics.ExportMetricsServiceResponse, error) {
-	fmt.Println("inside metrics export", time.Now().Format(time.RFC3339))
 	return &collectormetrics.ExportMetricsServiceResponse{}, nil
 }
 
 // dummyGRPCListener is a test helper that builds a dummy grpc server that does nothing but
-// returns quickly so that we don't have to wait for timeouts
+// returns quickly so that we don't have to wait for timeouts.
 func dummyGRPCListener() func() {
 	grpcServer := grpc.NewServer()
 	collectortrace.RegisterTraceServiceServer(grpcServer, &dummyTraceServer{})
 	collectormetrics.RegisterMetricsServiceServer(grpcServer, &dummyMetricsServer{})
 
-	// we need to listen on localhost, not 0.0.0.0, to satisfy JAMF without causing problems
+	// we listen on localhost, not 0.0.0.0, because otherwise firewalls can get upset
+	// and get in the way of testing.
 	l, err := net.Listen("tcp", net.JoinHostPort("localhost", "4317"))
 	if err != nil {
 		panic("oops - dummyGrpcListener failed to start up!")
@@ -189,7 +188,6 @@ func TestValidConfig(t *testing.T) {
 	stopper := dummyGRPCListener()
 	defer stopper()
 
-	fmt.Println("before config", time.Now().Format(time.RFC3339))
 	shutdown, _ := ConfigureOpenTelemetry(
 		WithLogger(logger),
 		WithServiceName("test-service"),
@@ -236,9 +234,8 @@ func TestInvalidMetricsPushIntervalConfig(t *testing.T) {
 	shutdown, _ := ConfigureOpenTelemetry(
 		WithLogger(logger),
 		WithServiceName("test-service"),
-		WithSpanExporterEndpoint("localhost:4317"),
-		WithMetricExporterEndpoint("localhost:4317"),
 		WithMetricReportingPeriod(-time.Second),
+		withTestExporters(),
 	)
 	defer shutdown()
 
