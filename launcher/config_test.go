@@ -330,7 +330,7 @@ func TestEnvironmentVariables(t *testing.T) {
 	expected := &Config{
 		ExporterEndpoint:                "generic-url",
 		ExporterEndpointInsecure:        false,
-		TracesExporterEndpoint:          "satellite-url",
+		TracesExporterEndpoint:          "traces-url",
 		TracesExporterEndpointInsecure:  true,
 		TracesEnabled:                   true,
 		ServiceName:                     "test-service-name",
@@ -362,7 +362,7 @@ func TestConfigurationOverrides(t *testing.T) {
 		WithServiceVersion("override-service-version"),
 		WithExporterEndpoint("override-generic-url"),
 		WithExporterInsecure(false),
-		WithSpanExporterEndpoint("override-satellite-url"),
+		WithSpanExporterEndpoint("override-traces-url"),
 		WithSpanExporterInsecure(false),
 		WithMetricExporterEndpoint("override-metrics-url"),
 		WithMetricExporterInsecure(false),
@@ -389,7 +389,7 @@ func TestConfigurationOverrides(t *testing.T) {
 		ServiceVersion:                  "override-service-version",
 		ExporterEndpoint:                "override-generic-url",
 		ExporterEndpointInsecure:        false,
-		TracesExporterEndpoint:          "override-satellite-url",
+		TracesExporterEndpoint:          "override-traces-url",
 		TracesExporterEndpointInsecure:  false,
 		TracesEnabled:                   true,
 		MetricsExporterEndpoint:         "override-metrics-url",
@@ -649,7 +649,7 @@ func setenv(key string, value string) {
 
 func setEnvironment() {
 	setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "generic-url")
-	setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "satellite-url")
+	setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "traces-url")
 	setenv("OTEL_EXPORTER_OTLP_TRACES_INSECURE", "true")
 	setenv("OTEL_SERVICE_NAME", "test-service-name")
 	setenv("OTEL_SERVICE_VERSION", "test-service-version")
