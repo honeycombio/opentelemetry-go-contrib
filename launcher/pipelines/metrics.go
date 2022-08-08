@@ -16,6 +16,8 @@ package pipelines
 
 import (
 	"context"
+	"crypto/tls"
+	"errors"
 	"fmt"
 	"time"
 
@@ -23,6 +25,7 @@ import (
 	runtimeMetrics "go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	metricglobal "go.opentelemetry.io/otel/metric/global"
 	controller "go.opentelemetry.io/otel/sdk/metric/controller/basic"
 	processor "go.opentelemetry.io/otel/sdk/metric/processor/basic"
@@ -32,8 +35,9 @@ import (
 )
 
 // NewMetricsPipeline takes a PipelineConfig and builds a metrics pipeline.
+// It returns a shutdown function that should be called when terminating the pipeline.
 func NewMetricsPipeline(c PipelineConfig) (func() error, error) {
-	metricExporter, err := newMetricsExporter(c.Endpoint, c.Insecure, c.Headers)
+	metricExporter, err := newMetricsExporter(c.Protocol, c.Endpoint, c.Insecure, c.Headers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create metric exporter: %v", err)
 	}
@@ -78,7 +82,21 @@ func NewMetricsPipeline(c PipelineConfig) (func() error, error) {
 }
 
 //revive:disable:flag-parameter internal function
-func newMetricsExporter(endpoint string, insecure bool, headers map[string]string) (*otlpmetric.Exporter, error) {
+func newMetricsExporter(protocol string, endpoint string, insecure bool, headers map[string]string) (*otlpmetric.Exporter, error) {
+	switch protocol {
+	case "grpc":
+		return newGRPCMetricsExporter(endpoint, insecure, headers)
+	case "http/protobuf":
+		return newHTTPMetricsExporter(endpoint, insecure, headers)
+	case "http/json":
+		return nil, errors.New("http/json is currently unsupported by this launcher")
+	default:
+		return nil, errors.New("'" + protocol + "' is not a supported protocol")
+	}
+}
+
+//revive:disable:flag-parameter internal function
+func newGRPCMetricsExporter(endpoint string, insecure bool, headers map[string]string) (*otlpmetric.Exporter, error) {
 	secureOption := otlpmetricgrpc.WithTLSCredentials(credentials.NewClientTLSFromCert(nil, ""))
 	if insecure {
 		secureOption = otlpmetricgrpc.WithInsecure()
@@ -90,6 +108,27 @@ func newMetricsExporter(endpoint string, insecure bool, headers map[string]strin
 			otlpmetricgrpc.WithEndpoint(endpoint),
 			otlpmetricgrpc.WithHeaders(headers),
 			otlpmetricgrpc.WithCompressor(gzip.Name),
+		),
+	)
+}
+
+//revive:disable:flag-parameter internal function
+func newHTTPMetricsExporter(endpoint string, insecure bool, headers map[string]string) (*otlpmetric.Exporter, error) {
+	tlsconfig := &tls.Config{}
+	secureOption := otlpmetrichttp.WithTLSClientConfig(tlsconfig)
+	if insecure {
+		secureOption = otlpmetrichttp.WithInsecure()
+	}
+	if insecure {
+		secureOption = otlpmetrichttp.WithInsecure()
+	}
+	return otlpmetric.New(
+		context.Background(),
+		otlpmetrichttp.NewClient(
+			secureOption,
+			otlpmetrichttp.WithEndpoint(endpoint),
+			otlpmetrichttp.WithHeaders(headers),
+			otlpmetrichttp.WithCompression(otlpmetrichttp.GzipCompression),
 		),
 	)
 }

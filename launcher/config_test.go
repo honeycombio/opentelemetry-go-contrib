@@ -301,6 +301,7 @@ func TestDefaultConfig(t *testing.T) {
 		Propagators:                     []string{"tracecontext", "baggage"},
 		Resource:                        resource.NewWithAttributes(semconv.SchemaURL, attributes...),
 		Logger:                          logger,
+		ExporterProtocol:                "grpc",
 		errorHandler:                    handler,
 	}
 	assert.Equal(t, expected, config)
@@ -341,6 +342,7 @@ func TestEnvironmentVariables(t *testing.T) {
 		Propagators:                     []string{"b3", "w3c"},
 		Resource:                        resource.NewWithAttributes(semconv.SchemaURL, attributes...),
 		Logger:                          logger,
+		ExporterProtocol:                "foobar",
 		errorHandler:                    handler,
 	}
 	assert.Equal(t, expected, config)
@@ -362,6 +364,9 @@ func TestConfigurationOverrides(t *testing.T) {
 		WithLogger(logger),
 		WithErrorHandler(handler),
 		WithPropagators([]string{"b3"}),
+		WithExporterProtocol("defaultProtocol"),
+		WithMetricsExporterProtocol("metricsProtocol"),
+		WithTracesExporterProtocol("tracesProtocol"),
 	)
 
 	attributes := []attribute.KeyValue{
@@ -389,6 +394,9 @@ func TestConfigurationOverrides(t *testing.T) {
 		Propagators:                     []string{"b3"},
 		Resource:                        resource.NewWithAttributes(semconv.SchemaURL, attributes...),
 		Logger:                          logger,
+		ExporterProtocol:                "defaultProtocol",
+		TracesExporterProtocol:          "tracesProtocol",
+		MetricsExporterProtocol:         "metricsProtocol",
 		errorHandler:                    handler,
 	}
 	assert.Equal(t, expected, config)
@@ -642,6 +650,7 @@ func setEnvironment() {
 	setenv("OTEL_LOG_LEVEL", "debug")
 	setenv("OTEL_PROPAGATORS", "b3,w3c")
 	setenv("OTEL_RESOURCE_ATTRIBUTES", "service.name=test-service-name-b")
+	setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "foobar")
 }
 
 func unsetEnvironment() {
@@ -657,6 +666,7 @@ func unsetEnvironment() {
 		"OTEL_RESOURCE_ATTRIBUTES",
 		"OTEL_EXPORTER_OTLP_METRICS_PERIOD",
 		"OTEL_METRICS_ENABLED",
+		"OTEL_EXPORTER_OTLP_PROTOCOL",
 	}
 	for _, envvar := range vars {
 		_ = os.Unsetenv(envvar)

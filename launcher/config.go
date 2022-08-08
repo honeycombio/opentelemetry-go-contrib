@@ -170,6 +170,32 @@ func WithShutdown(f func(c *Config) error) Option {
 	}
 }
 
+type Protocol string
+
+const (
+	Protocol_GRPC          Protocol = "grpc"
+	Protocol_HTTP_Protobuf Protocol = "http/protobuf"
+	Protocol_HTTP_JSON     Protocol = "http/json"
+)
+
+func WithExporterProtocol(protocol Protocol) Option {
+	return func(c *Config) {
+		c.ExporterProtocol = string(protocol)
+	}
+}
+
+func WithTracesExporterProtocol(protocol Protocol) Option {
+	return func(c *Config) {
+		c.TracesExporterProtocol = string(protocol)
+	}
+}
+
+func WithMetricsExporterProtocol(protocol Protocol) Option {
+	return func(c *Config) {
+		c.MetricsExporterProtocol = string(protocol)
+	}
+}
+
 // Logger is an interface for a logger that can be passed to WithLogger.
 type Logger interface {
 	Fatalf(format string, v ...interface{})
@@ -225,6 +251,9 @@ type Config struct {
 	Propagators                     []string `env:"OTEL_PROPAGATORS,default=tracecontext,baggage"`
 	HeadersFromEnv                  string   `env:"OTEL_EXPORTER_OTLP_HEADERS"`
 	ResourceAttributesFromEnv       string   `env:"OTEL_RESOURCE_ATTRIBUTES"`
+	ExporterProtocol                string   `env:"OTEL_EXPORTER_OTLP_PROTOCOL,default=grpc"`
+	TracesExporterProtocol          string   `env:"OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"`
+	MetricsExporterProtocol         string   `env:"OTEL_EXPORTER_OTLP_METRICS_PROTOCOL"`
 	Headers                         map[string]string
 	ResourceAttributes              map[string]string
 	SpanProcessors                  []trace.SpanProcessor
@@ -331,7 +360,15 @@ func setupTracing(c Config) (func() error, error) {
 		c.Logger.Debugf("tracing is disabled by configuration: no endpoint set")
 		return nil, nil
 	}
+
+	// If a Traces-specific protocol wasn't specified, then use the generic one,
+	// which has a default value.
+	if c.TracesExporterProtocol == "" {
+		c.TracesExporterProtocol = c.ExporterProtocol
+	}
+
 	return pipelines.NewTracePipeline(pipelines.PipelineConfig{
+		Protocol:       c.TracesExporterProtocol,
 		Endpoint:       c.TracesExporterEndpoint,
 		Insecure:       c.TracesExporterEndpointInsecure,
 		Headers:        c.Headers,
@@ -346,7 +383,14 @@ func setupMetrics(c Config) (func() error, error) {
 		c.Logger.Debugf("metrics are disabled by configuration: no endpoint set")
 		return nil, nil
 	}
+	// If a Metrics-specific protocol wasn't specified, then use the generic one,
+	// which has a default value.
+	if c.MetricsExporterProtocol == "" {
+		c.MetricsExporterProtocol = c.ExporterProtocol
+	}
+
 	return pipelines.NewMetricsPipeline(pipelines.PipelineConfig{
+		Protocol:        c.MetricsExporterProtocol,
 		Endpoint:        c.MetricsExporterEndpoint,
 		Insecure:        c.MetricsExporterEndpointInsecure,
 		Headers:         c.Headers,

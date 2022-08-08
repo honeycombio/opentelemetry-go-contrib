@@ -21,6 +21,7 @@ import (
 
 // PipelineConfig contains config info for a Pipeline.
 type PipelineConfig struct {
+	Protocol        string
 	Endpoint        string
 	Insecure        bool
 	Headers         map[string]string
