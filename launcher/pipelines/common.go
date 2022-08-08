@@ -19,10 +19,10 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 )
 
-// Protocol defines the possible values of the protocol field
+// Protocol defines the possible values of the protocol field.
 type Protocol string
 
-// These are the only possible values for Protocol
+// These are the only possible values for Protocol.
 const (
 	ProtocolGRPC         Protocol = "grpc"
 	ProtocolHTTPProtobuf Protocol = "http/protobuf"
