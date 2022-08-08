@@ -170,31 +170,31 @@ func WithShutdown(f func(c *Config) error) Option {
 	}
 }
 
-// Protocol defines the possible values of the protocol field
+// Protocol defines the possible values of the protocol field.
 type Protocol pipelines.Protocol
 
 // Import the values for Protocol from pipelines but make them available without importing pipelines.
 const (
-	Protocol_GRPC          Protocol = Protocol(pipelines.Protocol_GRPC)
-	Protocol_HTTP_Protobuf Protocol = Protocol(pipelines.Protocol_HTTP_Protobuf)
-	Protocol_HTTP_JSON     Protocol = Protocol(pipelines.Protocol_HTTP_JSON)
+	ProtocolGRPC      Protocol = Protocol(pipelines.ProtocolGRPC)
+	ProtocolHTTPProto Protocol = Protocol(pipelines.ProtocolHTTPProtobuf)
+	ProtocolHTTPJSON  Protocol = Protocol(pipelines.ProtocolHTTPJSON)
 )
 
-// WithExporterProtocol defines the default protocol
+// WithExporterProtocol defines the default protocol.
 func WithExporterProtocol(protocol Protocol) Option {
 	return func(c *Config) {
 		c.ExporterProtocol = string(protocol)
 	}
 }
 
-// WithTracesExporterProtocol defines the protocol for Traces
+// WithTracesExporterProtocol defines the protocol for Traces.
 func WithTracesExporterProtocol(protocol Protocol) Option {
 	return func(c *Config) {
 		c.TracesExporterProtocol = string(protocol)
 	}
 }
 
-// WithMetricsExporterProtocol defines the protocol for Metrics
+// WithMetricsExporterProtocol defines the protocol for Metrics.
 func WithMetricsExporterProtocol(protocol Protocol) Option {
 	return func(c *Config) {
 		c.MetricsExporterProtocol = string(protocol)

@@ -81,7 +81,7 @@ func NewMetricsPipeline(c PipelineConfig) (func() error, error) {
 	}, nil
 }
 
-//revive:disable:flag-parameter internal function
+//revive:disable:flag-parameter bools are fine for an internal function
 func newMetricsExporter(protocol Protocol, endpoint string, insecure bool, headers map[string]string) (*otlpmetric.Exporter, error) {
 	switch protocol {
 	case "grpc":
@@ -95,7 +95,6 @@ func newMetricsExporter(protocol Protocol, endpoint string, insecure bool, heade
 	}
 }
 
-//revive:disable:flag-parameter internal function
 func newGRPCMetricsExporter(endpoint string, insecure bool, headers map[string]string) (*otlpmetric.Exporter, error) {
 	secureOption := otlpmetricgrpc.WithTLSCredentials(credentials.NewClientTLSFromCert(nil, ""))
 	if insecure {
@@ -112,7 +111,6 @@ func newGRPCMetricsExporter(endpoint string, insecure bool, headers map[string]s
 	)
 }
 
-//revive:disable:flag-parameter internal function
 func newHTTPMetricsExporter(endpoint string, insecure bool, headers map[string]string) (*otlpmetric.Exporter, error) {
 	tlsconfig := &tls.Config{}
 	secureOption := otlpmetrichttp.WithTLSClientConfig(tlsconfig)

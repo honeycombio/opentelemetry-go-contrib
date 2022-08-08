@@ -65,7 +65,7 @@ func NewTracePipeline(c PipelineConfig) (func() error, error) {
 	}, nil
 }
 
-//revive:disable:flag-parameter internal function
+//revive:disable:flag-parameter bools are fine for an internal function
 func newTraceExporter(protocol Protocol, endpoint string, insecure bool, headers map[string]string) (*otlptrace.Exporter, error) {
 	switch protocol {
 	case "grpc":
@@ -79,7 +79,6 @@ func newTraceExporter(protocol Protocol, endpoint string, insecure bool, headers
 	}
 }
 
-//revive:disable:flag-parameter internal function
 func newGRPCTraceExporter(endpoint string, insecure bool, headers map[string]string) (*otlptrace.Exporter, error) {
 	secureOption := otlptracegrpc.WithTLSCredentials(credentials.NewClientTLSFromCert(nil, ""))
 	if insecure {
@@ -96,7 +95,6 @@ func newGRPCTraceExporter(endpoint string, insecure bool, headers map[string]str
 	)
 }
 
-//revive:disable:flag-parameter internal function
 func newHTTPTraceExporter(endpoint string, insecure bool, headers map[string]string) (*otlptrace.Exporter, error) {
 	tlsconfig := &tls.Config{}
 	secureOption := otlptracehttp.WithTLSClientConfig(tlsconfig)
