@@ -66,7 +66,7 @@ func NewTracePipeline(c PipelineConfig) (func() error, error) {
 }
 
 //revive:disable:flag-parameter internal function
-func newTraceExporter(protocol string, endpoint string, insecure bool, headers map[string]string) (*otlptrace.Exporter, error) {
+func newTraceExporter(protocol Protocol, endpoint string, insecure bool, headers map[string]string) (*otlptrace.Exporter, error) {
 	switch protocol {
 	case "grpc":
 		return newGRPCTraceExporter(endpoint, insecure, headers)
@@ -75,7 +75,7 @@ func newTraceExporter(protocol string, endpoint string, insecure bool, headers m
 	case "http/json":
 		return nil, errors.New("http/json is currently unsupported by this launcher")
 	default:
-		return nil, errors.New("'" + protocol + "' is not a supported protocol")
+		return nil, errors.New("'" + string(protocol) + "' is not a supported protocol")
 	}
 }
 

@@ -19,9 +19,11 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 )
 
+type Protocol string
+
 // PipelineConfig contains config info for a Pipeline.
 type PipelineConfig struct {
-	Protocol        string
+	Protocol        Protocol
 	Endpoint        string
 	Insecure        bool
 	Headers         map[string]string

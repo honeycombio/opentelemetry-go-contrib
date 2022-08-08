@@ -170,7 +170,7 @@ func WithShutdown(f func(c *Config) error) Option {
 	}
 }
 
-type Protocol string
+type Protocol pipelines.Protocol
 
 const (
 	Protocol_GRPC          Protocol = "grpc"
@@ -368,7 +368,7 @@ func setupTracing(c Config) (func() error, error) {
 	}
 
 	return pipelines.NewTracePipeline(pipelines.PipelineConfig{
-		Protocol:       c.TracesExporterProtocol,
+		Protocol:       pipelines.Protocol(c.TracesExporterProtocol),
 		Endpoint:       c.TracesExporterEndpoint,
 		Insecure:       c.TracesExporterEndpointInsecure,
 		Headers:        c.Headers,
@@ -390,7 +390,7 @@ func setupMetrics(c Config) (func() error, error) {
 	}
 
 	return pipelines.NewMetricsPipeline(pipelines.PipelineConfig{
-		Protocol:        c.MetricsExporterProtocol,
+		Protocol:        pipelines.Protocol(c.MetricsExporterProtocol),
 		Endpoint:        c.MetricsExporterEndpoint,
 		Insecure:        c.MetricsExporterEndpointInsecure,
 		Headers:         c.Headers,

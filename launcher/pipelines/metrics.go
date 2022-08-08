@@ -82,7 +82,7 @@ func NewMetricsPipeline(c PipelineConfig) (func() error, error) {
 }
 
 //revive:disable:flag-parameter internal function
-func newMetricsExporter(protocol string, endpoint string, insecure bool, headers map[string]string) (*otlpmetric.Exporter, error) {
+func newMetricsExporter(protocol Protocol, endpoint string, insecure bool, headers map[string]string) (*otlpmetric.Exporter, error) {
 	switch protocol {
 	case "grpc":
 		return newGRPCMetricsExporter(endpoint, insecure, headers)
@@ -91,7 +91,7 @@ func newMetricsExporter(protocol string, endpoint string, insecure bool, headers
 	case "http/json":
 		return nil, errors.New("http/json is currently unsupported by this launcher")
 	default:
-		return nil, errors.New("'" + protocol + "' is not a supported protocol")
+		return nil, errors.New("'" + string(protocol) + "' is not a supported protocol")
 	}
 }
 
