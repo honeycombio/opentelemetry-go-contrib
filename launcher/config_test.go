@@ -288,12 +288,12 @@ func TestDefaultConfig(t *testing.T) {
 	expected := &Config{
 		ExporterEndpoint:                "localhost:4317",
 		ExporterEndpointInsecure:        false,
-		TracesExporterEndpoint:          "localhost:4317",
+		TracesExporterEndpoint:          "",
 		TracesExporterEndpointInsecure:  false,
 		TracesEnabled:                   true,
 		ServiceName:                     "",
 		ServiceVersion:                  "unknown",
-		MetricsExporterEndpoint:         "localhost:4317",
+		MetricsExporterEndpoint:         "",
 		MetricsExporterEndpointInsecure: false,
 		MetricsEnabled:                  true,
 		MetricsReportingPeriod:          "30s",
@@ -329,7 +329,7 @@ func TestEnvironmentVariables(t *testing.T) {
 
 	expected := &Config{
 		ExporterEndpoint:                "generic-url",
-		ExporterEndpointInsecure:        false,
+		ExporterEndpointInsecure:        true,
 		TracesExporterEndpoint:          "traces-url",
 		TracesExporterEndpointInsecure:  true,
 		TracesEnabled:                   true,
@@ -642,6 +642,65 @@ func TestConfigWithResourceAttributes(t *testing.T) {
 	defer shutdown()
 }
 
+func TestEmptyTracesEndpointFallsBackToGenericEndpoint(t *testing.T) {
+	unsetEnvironment()
+	testCases := []struct {
+		name            string
+		config          *Config
+		tracesEndpoint  string
+		tracesInsecure  bool
+		metricsEndpoint string
+		metricsInsecure bool
+	}{
+		{
+			name:            "defaults",
+			config:          newConfig(),
+			tracesEndpoint:  "localhost:4317",
+			tracesInsecure:  false,
+			metricsEndpoint: "localhost:4317",
+			metricsInsecure: false,
+		},
+		{
+			name: "set generic endpoint / insecure",
+			config: newConfig(
+				WithExporterEndpoint("generic-url"),
+				WithExporterInsecure(true),
+			),
+			tracesEndpoint:  "generic-url",
+			tracesInsecure:  true,
+			metricsEndpoint: "generic-url",
+			metricsInsecure: true,
+		},
+		{
+			name: "set specific endpoint / insecure",
+			config: newConfig(
+				WithExporterEndpoint("generic-url"),
+				WithExporterInsecure(false),
+				WithSpanExporterEndpoint("traces-url"),
+				WithSpanExporterInsecure(true),
+				WithMetricExporterEndpoint("metrics-url"),
+				WithMetricExporterInsecure(true),
+			),
+			tracesEndpoint:  "traces-url",
+			tracesInsecure:  true,
+			metricsEndpoint: "metrics-url",
+			metricsInsecure: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tracesEndpoint, tracesInsecure := tc.config.getTracesEndpoint()
+			assert.Equal(t, tc.tracesEndpoint, tracesEndpoint)
+			assert.Equal(t, tc.tracesInsecure, tracesInsecure)
+
+			metricsEndpoint, metricsInsecure := tc.config.getMetricsEndpoint()
+			assert.Equal(t, tc.metricsEndpoint, metricsEndpoint)
+			assert.Equal(t, tc.metricsInsecure, metricsInsecure)
+		})
+	}
+}
+
 // setenv is to stop the linter from complaining.
 func setenv(key string, value string) {
 	_ = os.Setenv(key, value)
@@ -649,6 +708,7 @@ func setenv(key string, value string) {
 
 func setEnvironment() {
 	setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "generic-url")
+	setenv("OTEL_EXPORTER_OTLP_INSECURE", "true")
 	setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "traces-url")
 	setenv("OTEL_EXPORTER_OTLP_TRACES_INSECURE", "true")
 	setenv("OTEL_SERVICE_NAME", "test-service-name")
@@ -666,6 +726,8 @@ func unsetEnvironment() {
 	vars := []string{
 		"OTEL_SERVICE_NAME",
 		"OTEL_SERVICE_VERSION",
+		"OTEL_EXPORTER_OTLP_ENDPOINT",
+		"OTEL_EXPORTER_OTLP_INSECURE",
 		"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
 		"OTEL_EXPORTER_OTLP_TRACES_INSECURE",
 		"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",

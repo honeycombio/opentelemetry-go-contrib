@@ -259,13 +259,13 @@ func (l *defaultHandler) Handle(err error) {
 type Config struct {
 	ExporterEndpoint                string   `env:"OTEL_EXPORTER_OTLP_ENDPOINT,default=localhost:4317"`
 	ExporterEndpointInsecure        bool     `env:"OTEL_EXPORTER_OTLP_INSECURE,default=false"`
-	TracesExporterEndpoint          string   `env:"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,default=localhost:4317"`
-	TracesExporterEndpointInsecure  bool     `env:"OTEL_EXPORTER_OTLP_TRACES_INSECURE,default=false"`
+	TracesExporterEndpoint          string   `env:"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"`
+	TracesExporterEndpointInsecure  bool     `env:"OTEL_EXPORTER_OTLP_TRACES_INSECURE"`
 	TracesEnabled                   bool     `env:"OTEL_TRACES_ENABLED,default=true"`
 	ServiceName                     string   `env:"OTEL_SERVICE_NAME"`
 	ServiceVersion                  string   `env:"OTEL_SERVICE_VERSION,default=unknown"`
-	MetricsExporterEndpoint         string   `env:"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,default=localhost:4317"`
-	MetricsExporterEndpointInsecure bool     `env:"OTEL_EXPORTER_OTLP_METRICS_INSECURE,default=false"`
+	MetricsExporterEndpoint         string   `env:"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"`
+	MetricsExporterEndpointInsecure bool     `env:"OTEL_EXPORTER_OTLP_METRICS_INSECURE"`
 	MetricsEnabled                  bool     `env:"OTEL_METRICS_ENABLED,default=true"`
 	MetricsReportingPeriod          string   `env:"OTEL_EXPORTER_OTLP_METRICS_PERIOD,default=30s"`
 	LogLevel                        string   `env:"OTEL_LOG_LEVEL,default=info"`
@@ -376,6 +376,22 @@ func newResource(c *Config) *resource.Resource {
 
 type setupFunc func(Config) (func() error, error)
 
+func (c Config) getTracesEndpoint() (string, bool) {
+	// use traces specific endpoint, falling back to generic version if not set
+	if c.TracesExporterEndpoint != "" {
+		return c.TracesExporterEndpoint, c.TracesExporterEndpointInsecure
+	}
+	return c.ExporterEndpoint, c.ExporterEndpointInsecure
+}
+
+func (c Config) getMetricsEndpoint() (string, bool) {
+	// use metrics specific endpoint, falling back to generic version if not set
+	if c.MetricsExporterEndpoint != "" {
+		return c.MetricsExporterEndpoint, c.MetricsExporterEndpointInsecure
+	}
+	return c.ExporterEndpoint, c.ExporterEndpointInsecure
+}
+
 func setupTracing(c Config) (func() error, error) {
 	if !c.TracesEnabled || c.TracesExporterEndpoint == "" {
 		c.Logger.Debugf("tracing is disabled by configuration: no endpoint set")
@@ -388,17 +404,11 @@ func setupTracing(c Config) (func() error, error) {
 		c.TracesExporterProtocol = c.ExporterProtocol
 	}
 
-	// If a Trace-specific endpoint wasn't specified, then use the generic one,
-	// which has a default value.
-	if c.TracesExporterEndpoint == "" {
-		c.ExporterEndpoint = c.ExporterEndpoint
-		c.ExporterEndpointInsecure = c.ExporterEndpointInsecure
-	}
-
+	endpoint, insecure := c.getTracesEndpoint()
 	return pipelines.NewTracePipeline(pipelines.PipelineConfig{
 		Protocol:       pipelines.Protocol(c.TracesExporterProtocol),
-		Endpoint:       c.TracesExporterEndpoint,
-		Insecure:       c.TracesExporterEndpointInsecure,
+		Endpoint:       endpoint,
+		Insecure:       insecure,
 		Headers:        c.Headers,
 		Resource:       c.Resource,
 		Propagators:    c.Propagators,
@@ -418,17 +428,11 @@ func setupMetrics(c Config) (func() error, error) {
 		c.MetricsExporterProtocol = c.ExporterProtocol
 	}
 
-	// If a Metrics-specific endpoint wasn't specified, then use the generic one,
-	// which has a default value.
-	if c.MetricsExporterEndpoint == "" {
-		c.ExporterEndpoint = c.ExporterEndpoint
-		c.ExporterEndpointInsecure = c.ExporterEndpointInsecure
-	}
-
+	endpoint, insecure := c.getMetricsEndpoint()
 	return pipelines.NewMetricsPipeline(pipelines.PipelineConfig{
 		Protocol:        pipelines.Protocol(c.MetricsExporterProtocol),
-		Endpoint:        c.MetricsExporterEndpoint,
-		Insecure:        c.MetricsExporterEndpointInsecure,
+		Endpoint:        endpoint,
+		Insecure:        insecure,
 		Headers:         c.Headers,
 		Resource:        c.Resource,
 		ReportingPeriod: c.MetricsReportingPeriod,
