@@ -286,7 +286,7 @@ func TestDefaultConfig(t *testing.T) {
 	}
 
 	expected := &Config{
-		ExporterEndpoint:                "localhost:4317",
+		ExporterEndpoint:                "localhost:DEFAULTPORT",
 		ExporterEndpointInsecure:        false,
 		TracesExporterEndpoint:          "",
 		TracesExporterEndpointInsecure:  false,
@@ -655,9 +655,9 @@ func TestEmptyTracesEndpointFallsBackToGenericEndpoint(t *testing.T) {
 		{
 			name:            "defaults",
 			config:          newConfig(),
-			tracesEndpoint:  "localhost:4317",
+			tracesEndpoint:  "localhost:DEFAULTPORT",
 			tracesInsecure:  false,
-			metricsEndpoint: "localhost:4317",
+			metricsEndpoint: "localhost:DEFAULTPORT",
 			metricsInsecure: false,
 		},
 		{

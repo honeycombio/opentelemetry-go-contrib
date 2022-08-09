@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	// TODO: before merging, update to "go.opentelemetry.io/contrib/launcher".
@@ -38,6 +39,14 @@ var (
 	// ValidateConfig is a function that a vendor can implement to provide additional validation after
 	// a configuration is built.
 	ValidateConfig func(*Config) error
+)
+
+// These are strings because they get appended to the host
+const (
+	// GRPC default port
+	GRPCDefaultPort = "4317"
+	// HTTP default port
+	HTTPDefaultPort = "4318"
 )
 
 // Option is the type of an Option to the ConfigureOpenTelemetry function; it's a
@@ -197,21 +206,21 @@ const (
 // WithExporterProtocol defines the default protocol.
 func WithExporterProtocol(protocol Protocol) Option {
 	return func(c *Config) {
-		c.ExporterProtocol = string(protocol)
+		c.ExporterProtocol = protocol
 	}
 }
 
 // WithTracesExporterProtocol defines the protocol for Traces.
 func WithTracesExporterProtocol(protocol Protocol) Option {
 	return func(c *Config) {
-		c.TracesExporterProtocol = string(protocol)
+		c.TracesExporterProtocol = protocol
 	}
 }
 
 // WithMetricsExporterProtocol defines the protocol for Metrics.
 func WithMetricsExporterProtocol(protocol Protocol) Option {
 	return func(c *Config) {
-		c.MetricsExporterProtocol = string(protocol)
+		c.MetricsExporterProtocol = protocol
 	}
 }
 
@@ -256,8 +265,11 @@ func (l *defaultHandler) Handle(err error) {
 }
 
 // Config is a configuration object; it is public so that it can be manipulated by vendors.
+// Note that ExporterEndpoint specifies "DEFAULTPORT"; this is because the default port should
+// vary depending on the protocol chosen. If not overridden by explicit configuration, it will
+// be overridden with an appropriate default upon initialization.
 type Config struct {
-	ExporterEndpoint                string   `env:"OTEL_EXPORTER_OTLP_ENDPOINT,default=localhost:4317"`
+	ExporterEndpoint                string   `env:"OTEL_EXPORTER_OTLP_ENDPOINT,default=localhost:DEFAULTPORT"`
 	ExporterEndpointInsecure        bool     `env:"OTEL_EXPORTER_OTLP_INSECURE,default=false"`
 	TracesExporterEndpoint          string   `env:"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"`
 	TracesExporterEndpointInsecure  bool     `env:"OTEL_EXPORTER_OTLP_TRACES_INSECURE"`
@@ -272,9 +284,9 @@ type Config struct {
 	Propagators                     []string `env:"OTEL_PROPAGATORS,default=tracecontext,baggage"`
 	HeadersFromEnv                  string   `env:"OTEL_EXPORTER_OTLP_HEADERS"`
 	ResourceAttributesFromEnv       string   `env:"OTEL_RESOURCE_ATTRIBUTES"`
-	ExporterProtocol                string   `env:"OTEL_EXPORTER_OTLP_PROTOCOL,default=grpc"`
-	TracesExporterProtocol          string   `env:"OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"`
-	MetricsExporterProtocol         string   `env:"OTEL_EXPORTER_OTLP_METRICS_PROTOCOL"`
+	ExporterProtocol                Protocol `env:"OTEL_EXPORTER_OTLP_PROTOCOL,default=grpc"`
+	TracesExporterProtocol          Protocol `env:"OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"`
+	MetricsExporterProtocol         Protocol `env:"OTEL_EXPORTER_OTLP_METRICS_PROTOCOL"`
 	Headers                         map[string]string
 	ResourceAttributes              map[string]string
 	SpanProcessors                  []trace.SpanProcessor
@@ -405,6 +417,13 @@ func setupTracing(c Config) (func() error, error) {
 	}
 
 	endpoint, insecure := c.getTracesEndpoint()
+	switch c.TracesExporterProtocol {
+	case ProtocolGRPC:
+		endpoint = strings.Replace(endpoint, "DEFAULTPORT", GRPCDefaultPort, -1)
+	case ProtocolHTTPProto, ProtocolHTTPJSON:
+		endpoint = strings.Replace(endpoint, "DEFAULTPORT", HTTPDefaultPort, -1)
+	}
+
 	return pipelines.NewTracePipeline(pipelines.PipelineConfig{
 		Protocol:       pipelines.Protocol(c.TracesExporterProtocol),
 		Endpoint:       endpoint,
@@ -429,6 +448,14 @@ func setupMetrics(c Config) (func() error, error) {
 	}
 
 	endpoint, insecure := c.getMetricsEndpoint()
+
+	switch c.MetricsExporterProtocol {
+	case ProtocolGRPC:
+		endpoint = strings.Replace(endpoint, "DEFAULTPORT", GRPCDefaultPort, -1)
+	case ProtocolHTTPProto, ProtocolHTTPJSON:
+		endpoint = strings.Replace(endpoint, "DEFAULTPORT", HTTPDefaultPort, -1)
+	}
+
 	return pipelines.NewMetricsPipeline(pipelines.PipelineConfig{
 		Protocol:        pipelines.Protocol(c.MetricsExporterProtocol),
 		Endpoint:        endpoint,
