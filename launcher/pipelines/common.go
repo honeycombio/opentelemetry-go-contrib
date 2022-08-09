@@ -19,8 +19,19 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 )
 
+// Protocol defines the possible values of the protocol field.
+type Protocol string
+
+// These are the only possible values for Protocol.
+const (
+	ProtocolGRPC         Protocol = "grpc"
+	ProtocolHTTPProtobuf Protocol = "http/protobuf"
+	ProtocolHTTPJSON     Protocol = "http/json"
+)
+
 // PipelineConfig contains config info for a Pipeline.
 type PipelineConfig struct {
+	Protocol        Protocol
 	Endpoint        string
 	Insecure        bool
 	Headers         map[string]string

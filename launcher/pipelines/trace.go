@@ -16,6 +16,8 @@ package pipelines
 
 import (
 	"context"
+	"crypto/tls"
+	"errors"
 	"fmt"
 
 	"go.opentelemetry.io/contrib/propagators/b3"
@@ -23,6 +25,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"google.golang.org/grpc/credentials"
@@ -30,6 +33,7 @@ import (
 )
 
 // NewTracePipeline creates a new trace pipeline from a config.
+// It returns a shutdown function that should be called when terminating the pipeline.
 func NewTracePipeline(c PipelineConfig) (func() error, error) {
 	opts := []trace.TracerProviderOption{
 		trace.WithResource(c.Resource),
@@ -40,7 +44,7 @@ func NewTracePipeline(c PipelineConfig) (func() error, error) {
 	}
 
 	// make sure the exporter is added last
-	spanExporter, err := newTraceExporter(c.Endpoint, c.Insecure, c.Headers)
+	spanExporter, err := newTraceExporter(c.Protocol, c.Endpoint, c.Insecure, c.Headers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create span exporter: %v", err)
 	}
@@ -61,8 +65,21 @@ func NewTracePipeline(c PipelineConfig) (func() error, error) {
 	}, nil
 }
 
-//revive:disable:flag-parameter internal function
-func newTraceExporter(endpoint string, insecure bool, headers map[string]string) (*otlptrace.Exporter, error) {
+//revive:disable:flag-parameter bools are fine for an internal function
+func newTraceExporter(protocol Protocol, endpoint string, insecure bool, headers map[string]string) (*otlptrace.Exporter, error) {
+	switch protocol {
+	case "grpc":
+		return newGRPCTraceExporter(endpoint, insecure, headers)
+	case "http/protobuf":
+		return newHTTPTraceExporter(endpoint, insecure, headers)
+	case "http/json":
+		return nil, errors.New("http/json is currently unsupported by this launcher")
+	default:
+		return nil, errors.New("'" + string(protocol) + "' is not a supported protocol")
+	}
+}
+
+func newGRPCTraceExporter(endpoint string, insecure bool, headers map[string]string) (*otlptrace.Exporter, error) {
 	secureOption := otlptracegrpc.WithTLSCredentials(credentials.NewClientTLSFromCert(nil, ""))
 	if insecure {
 		secureOption = otlptracegrpc.WithInsecure()
@@ -74,6 +91,23 @@ func newTraceExporter(endpoint string, insecure bool, headers map[string]string)
 			otlptracegrpc.WithEndpoint(endpoint),
 			otlptracegrpc.WithHeaders(headers),
 			otlptracegrpc.WithCompressor(gzip.Name),
+		),
+	)
+}
+
+func newHTTPTraceExporter(endpoint string, insecure bool, headers map[string]string) (*otlptrace.Exporter, error) {
+	tlsconfig := &tls.Config{}
+	secureOption := otlptracehttp.WithTLSClientConfig(tlsconfig)
+	if insecure {
+		secureOption = otlptracehttp.WithInsecure()
+	}
+	return otlptrace.New(
+		context.Background(),
+		otlptracehttp.NewClient(
+			secureOption,
+			otlptracehttp.WithEndpoint(endpoint),
+			otlptracehttp.WithHeaders(headers),
+			otlptracehttp.WithCompression(otlptracehttp.GzipCompression),
 		),
 	)
 }
