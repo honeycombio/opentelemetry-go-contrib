@@ -286,7 +286,7 @@ func TestDefaultConfig(t *testing.T) {
 	}
 
 	expected := &Config{
-		ExporterEndpoint:                "localhost:DEFAULTPORT",
+		ExporterEndpoint:                "localhost",
 		ExporterEndpointInsecure:        false,
 		TracesExporterEndpoint:          "",
 		TracesExporterEndpointInsecure:  false,
@@ -621,7 +621,6 @@ func TestConfigWithResourceAttributes(t *testing.T) {
 
 	shutdown, _ := ConfigureOpenTelemetry(
 		WithServiceName("test-service"),
-		WithSpanExporterEndpoint("localhost:443"),
 		WithResourceAttributes(map[string]string{
 			"attr1": "val1",
 			"attr2": "val2",
@@ -655,9 +654,9 @@ func TestEmptyTracesEndpointFallsBackToGenericEndpoint(t *testing.T) {
 		{
 			name:            "defaults",
 			config:          newConfig(),
-			tracesEndpoint:  "localhost:DEFAULTPORT",
+			tracesEndpoint:  "localhost:4317",
 			tracesInsecure:  false,
-			metricsEndpoint: "localhost:DEFAULTPORT",
+			metricsEndpoint: "localhost:4317",
 			metricsInsecure: false,
 		},
 		{
@@ -666,9 +665,9 @@ func TestEmptyTracesEndpointFallsBackToGenericEndpoint(t *testing.T) {
 				WithExporterEndpoint("generic-url"),
 				WithExporterInsecure(true),
 			),
-			tracesEndpoint:  "generic-url",
+			tracesEndpoint:  "generic-url:4317",
 			tracesInsecure:  true,
-			metricsEndpoint: "generic-url",
+			metricsEndpoint: "generic-url:4317",
 			metricsInsecure: true,
 		},
 		{
@@ -678,12 +677,12 @@ func TestEmptyTracesEndpointFallsBackToGenericEndpoint(t *testing.T) {
 				WithExporterInsecure(false),
 				WithSpanExporterEndpoint("traces-url"),
 				WithSpanExporterInsecure(true),
-				WithMetricExporterEndpoint("metrics-url"),
+				WithMetricExporterEndpoint("metrics-url:1234"),
 				WithMetricExporterInsecure(true),
 			),
-			tracesEndpoint:  "traces-url",
+			tracesEndpoint:  "traces-url:4317",
 			tracesInsecure:  true,
-			metricsEndpoint: "metrics-url",
+			metricsEndpoint: "metrics-url:1234",
 			metricsInsecure: true,
 		},
 	}

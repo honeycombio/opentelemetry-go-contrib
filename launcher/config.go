@@ -41,11 +41,11 @@ var (
 	ValidateConfig func(*Config) error
 )
 
-// These are strings because they get appended to the host
+// These are strings because they get appended to the host.
 const (
-	// GRPC default port
+	// GRPC default port.
 	GRPCDefaultPort = "4317"
-	// HTTP default port
+	// HTTP default port.
 	HTTPDefaultPort = "4318"
 )
 
@@ -269,7 +269,7 @@ func (l *defaultHandler) Handle(err error) {
 // vary depending on the protocol chosen. If not overridden by explicit configuration, it will
 // be overridden with an appropriate default upon initialization.
 type Config struct {
-	ExporterEndpoint                string   `env:"OTEL_EXPORTER_OTLP_ENDPOINT,default=localhost:DEFAULTPORT"`
+	ExporterEndpoint                string   `env:"OTEL_EXPORTER_OTLP_ENDPOINT,default=localhost"`
 	ExporterEndpointInsecure        bool     `env:"OTEL_EXPORTER_OTLP_INSECURE,default=false"`
 	TracesExporterEndpoint          string   `env:"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"`
 	TracesExporterEndpointInsecure  bool     `env:"OTEL_EXPORTER_OTLP_TRACES_INSECURE"`
@@ -386,44 +386,66 @@ func newResource(c *Config) *resource.Resource {
 	return r
 }
 
-type setupFunc func(Config) (func() error, error)
+type setupFunc func(*Config) (func() error, error)
 
-func (c Config) getTracesEndpoint() (string, bool) {
-	// use traces specific endpoint, falling back to generic version if not set
-	if c.TracesExporterEndpoint != "" {
-		return c.TracesExporterEndpoint, c.TracesExporterEndpointInsecure
+// ensures that a port is set on the given host string, or adds the default port
+func ensurePort(host string, defaultPort string) string {
+	ix := strings.Index(host, ":")
+	switch {
+	case ix < 0:
+		return host + ":" + defaultPort
+	case ix == len(host)-1:
+		return host + defaultPort
+	default:
+		return host
 	}
-	return c.ExporterEndpoint, c.ExporterEndpointInsecure
 }
 
-func (c Config) getMetricsEndpoint() (string, bool) {
-	// use metrics specific endpoint, falling back to generic version if not set
-	if c.MetricsExporterEndpoint != "" {
-		return c.MetricsExporterEndpoint, c.MetricsExporterEndpointInsecure
-	}
-	return c.ExporterEndpoint, c.ExporterEndpointInsecure
-}
-
-func setupTracing(c Config) (func() error, error) {
-	if !c.TracesEnabled || c.TracesExporterEndpoint == "" {
-		c.Logger.Debugf("tracing is disabled by configuration: no endpoint set")
-		return nil, nil
-	}
-
+func (c *Config) getTracesEndpoint() (string, bool) {
 	// If a Traces-specific protocol wasn't specified, then use the generic one,
 	// which has a default value.
 	if c.TracesExporterProtocol == "" {
 		c.TracesExporterProtocol = c.ExporterProtocol
 	}
 
-	endpoint, insecure := c.getTracesEndpoint()
-	switch c.TracesExporterProtocol {
-	case ProtocolGRPC:
-		endpoint = strings.Replace(endpoint, "DEFAULTPORT", GRPCDefaultPort, -1)
-	case ProtocolHTTPProto, ProtocolHTTPJSON:
-		endpoint = strings.Replace(endpoint, "DEFAULTPORT", HTTPDefaultPort, -1)
+	defaultPort := HTTPDefaultPort
+	if c.TracesExporterProtocol == ProtocolGRPC {
+		defaultPort = GRPCDefaultPort
 	}
 
+	// use traces-specific endpoint, falling back to generic version if not set
+	if c.TracesExporterEndpoint != "" {
+		return ensurePort(c.TracesExporterEndpoint, defaultPort), c.TracesExporterEndpointInsecure
+	}
+	return ensurePort(c.ExporterEndpoint, defaultPort), c.ExporterEndpointInsecure
+}
+
+func (c *Config) getMetricsEndpoint() (string, bool) {
+	// If a Metrics-specific protocol wasn't specified, then use the generic one,
+	// which has a default value.
+	if c.MetricsExporterProtocol == "" {
+		c.MetricsExporterProtocol = c.ExporterProtocol
+	}
+
+	defaultPort := HTTPDefaultPort
+	if c.MetricsExporterProtocol == ProtocolGRPC {
+		defaultPort = GRPCDefaultPort
+	}
+
+	// use metrics-specific endpoint, falling back to generic version if not set
+	if c.MetricsExporterEndpoint != "" {
+		return ensurePort(c.MetricsExporterEndpoint, defaultPort), c.MetricsExporterEndpointInsecure
+	}
+	return ensurePort(c.ExporterEndpoint, defaultPort), c.ExporterEndpointInsecure
+}
+
+func setupTracing(c *Config) (func() error, error) {
+	if !c.TracesEnabled || c.TracesExporterEndpoint == "" {
+		c.Logger.Debugf("tracing is disabled by configuration: no endpoint set")
+		return nil, nil
+	}
+
+	endpoint, insecure := c.getTracesEndpoint()
 	return pipelines.NewTracePipeline(pipelines.PipelineConfig{
 		Protocol:       pipelines.Protocol(c.TracesExporterProtocol),
 		Endpoint:       endpoint,
@@ -435,27 +457,13 @@ func setupTracing(c Config) (func() error, error) {
 	})
 }
 
-func setupMetrics(c Config) (func() error, error) {
+func setupMetrics(c *Config) (func() error, error) {
 	if !c.MetricsEnabled || c.MetricsExporterEndpoint == "" {
 		c.Logger.Debugf("metrics are disabled by configuration: no endpoint set")
 		return nil, nil
 	}
 
-	// If a Metrics-specific protocol wasn't specified, then use the generic one,
-	// which has a default value.
-	if c.MetricsExporterProtocol == "" {
-		c.MetricsExporterProtocol = c.ExporterProtocol
-	}
-
 	endpoint, insecure := c.getMetricsEndpoint()
-
-	switch c.MetricsExporterProtocol {
-	case ProtocolGRPC:
-		endpoint = strings.Replace(endpoint, "DEFAULTPORT", GRPCDefaultPort, -1)
-	case ProtocolHTTPProto, ProtocolHTTPJSON:
-		endpoint = strings.Replace(endpoint, "DEFAULTPORT", HTTPDefaultPort, -1)
-	}
-
 	return pipelines.NewMetricsPipeline(pipelines.PipelineConfig{
 		Protocol:        pipelines.Protocol(c.MetricsExporterProtocol),
 		Endpoint:        endpoint,
@@ -494,7 +502,7 @@ func ConfigureOpenTelemetry(opts ...Option) (func(), error) {
 	}
 
 	for _, setup := range []setupFunc{setupTracing, setupMetrics} {
-		shutdown, err := setup(*c)
+		shutdown, err := setup(c)
 		if err != nil {
 			c.Logger.Fatalf("setup error: %v", err)
 			continue
