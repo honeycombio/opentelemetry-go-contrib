@@ -44,6 +44,20 @@ var (
 // function that accepts a config and modifies it.
 type Option func(*Config)
 
+// WithExporterEndpoint configures the generic endpoint used for sending all telemtry signals via OTLP.
+func WithExporterEndpoint(url string) Option {
+	return func(c *Config) {
+		c.ExporterEndpoint = url
+	}
+}
+
+// WithExporterInsecure permits connecting to the generic exporter endpoint without a certificate.
+func WithExporterInsecure(insecure bool) Option {
+	return func(c *Config) {
+		c.ExporterEndpointInsecure = insecure
+	}
+}
+
 // WithMetricExporterEndpoint configures the endpoint for sending metrics via OTLP.
 func WithMetricExporterEndpoint(url string) Option {
 	return func(c *Config) {
@@ -243,6 +257,8 @@ func (l *defaultHandler) Handle(err error) {
 
 // Config is a configuration object; it is public so that it can be manipulated by vendors.
 type Config struct {
+	ExporterEndpoint                string   `env:"OTEL_EXPORTER_OTLP_ENDPOINT,default=localhost:4317"`
+	ExporterEndpointInsecure        bool     `env:"OTEL_EXPORTER_OTLP_INSECURE,default=false"`
 	TracesExporterEndpoint          string   `env:"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,default=localhost:4317"`
 	TracesExporterEndpointInsecure  bool     `env:"OTEL_EXPORTER_OTLP_TRACES_INSECURE,default=false"`
 	TracesEnabled                   bool     `env:"OTEL_TRACES_ENABLED,default=true"`
@@ -372,6 +388,13 @@ func setupTracing(c Config) (func() error, error) {
 		c.TracesExporterProtocol = c.ExporterProtocol
 	}
 
+	// If a Trace-specific endpoint wasn't specified, then use the generic one,
+	// which has a default value.
+	if c.TracesExporterEndpoint == "" {
+		c.ExporterEndpoint = c.ExporterEndpoint
+		c.ExporterEndpointInsecure = c.ExporterEndpointInsecure
+	}
+
 	return pipelines.NewTracePipeline(pipelines.PipelineConfig{
 		Protocol:       pipelines.Protocol(c.TracesExporterProtocol),
 		Endpoint:       c.TracesExporterEndpoint,
@@ -388,10 +411,18 @@ func setupMetrics(c Config) (func() error, error) {
 		c.Logger.Debugf("metrics are disabled by configuration: no endpoint set")
 		return nil, nil
 	}
+
 	// If a Metrics-specific protocol wasn't specified, then use the generic one,
 	// which has a default value.
 	if c.MetricsExporterProtocol == "" {
 		c.MetricsExporterProtocol = c.ExporterProtocol
+	}
+
+	// If a Metrics-specific endpoint wasn't specified, then use the generic one,
+	// which has a default value.
+	if c.MetricsExporterEndpoint == "" {
+		c.ExporterEndpoint = c.ExporterEndpoint
+		c.ExporterEndpointInsecure = c.ExporterEndpointInsecure
 	}
 
 	return pipelines.NewMetricsPipeline(pipelines.PipelineConfig{
