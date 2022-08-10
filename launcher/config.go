@@ -393,7 +393,8 @@ func (c Config) getMetricsEndpoint() (string, bool) {
 }
 
 func setupTracing(c Config) (func() error, error) {
-	if !c.TracesEnabled || c.TracesExporterEndpoint == "" {
+	endpoint, insecure := c.getTracesEndpoint()
+	if !c.TracesEnabled || endpoint == "" {
 		c.Logger.Debugf("tracing is disabled by configuration: no endpoint set")
 		return nil, nil
 	}
@@ -404,7 +405,6 @@ func setupTracing(c Config) (func() error, error) {
 		c.TracesExporterProtocol = c.ExporterProtocol
 	}
 
-	endpoint, insecure := c.getTracesEndpoint()
 	return pipelines.NewTracePipeline(pipelines.PipelineConfig{
 		Protocol:       pipelines.Protocol(c.TracesExporterProtocol),
 		Endpoint:       endpoint,
@@ -417,7 +417,8 @@ func setupTracing(c Config) (func() error, error) {
 }
 
 func setupMetrics(c Config) (func() error, error) {
-	if !c.MetricsEnabled || c.MetricsExporterEndpoint == "" {
+	endpoint, insecure := c.getMetricsEndpoint()
+	if !c.MetricsEnabled || endpoint == "" {
 		c.Logger.Debugf("metrics are disabled by configuration: no endpoint set")
 		return nil, nil
 	}
@@ -428,7 +429,6 @@ func setupMetrics(c Config) (func() error, error) {
 		c.MetricsExporterProtocol = c.ExporterProtocol
 	}
 
-	endpoint, insecure := c.getMetricsEndpoint()
 	return pipelines.NewMetricsPipeline(pipelines.PipelineConfig{
 		Protocol:        pipelines.Protocol(c.MetricsExporterProtocol),
 		Endpoint:        endpoint,
