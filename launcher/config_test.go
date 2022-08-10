@@ -28,6 +28,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.10.0"
 	collectormetrics "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	collectortrace "go.opentelemetry.io/proto/otlp/collector/trace/v1"
@@ -699,6 +700,25 @@ func TestEmptyTracesEndpointFallsBackToGenericEndpoint(t *testing.T) {
 			assert.Equal(t, tc.metricsInsecure, metricsInsecure)
 		})
 	}
+}
+
+func TestCanConfigureCustomSampler(t *testing.T) {
+	sampler := &testSampler{}
+	config := newConfig(
+		WithSampler(sampler),
+	)
+
+	assert.Same(t, config.Sampler, sampler)
+}
+
+type testSampler struct{}
+
+func (ts *testSampler) ShouldSample(parameters trace.SamplingParameters) trace.SamplingResult {
+	return trace.SamplingResult{}
+}
+
+func (ts *testSampler) Description() string {
+	return "testSampler"
 }
 
 // setenv is to stop the linter from complaining.
