@@ -641,7 +641,7 @@ func TestConfigWithResourceAttributes(t *testing.T) {
 	defer shutdown()
 }
 
-func TestEmptyTracesEndpointFallsBackToGenericEndpoint(t *testing.T) {
+func TestThatEndpointFallsBackCorrectly(t *testing.T) {
 	unsetEnvironment()
 	testCases := []struct {
 		name            string
@@ -684,6 +684,18 @@ func TestEmptyTracesEndpointFallsBackToGenericEndpoint(t *testing.T) {
 			tracesInsecure:  true,
 			metricsEndpoint: "metrics-url:1234",
 			metricsInsecure: true,
+		},
+		{
+			name: "set traces to protobuf, metrics default",
+			config: newConfig(
+				WithTracesExporterProtocol("http/protobuf"),
+				WithSpanExporterEndpoint("traces-url"),
+				WithSpanExporterInsecure(true),
+			),
+			tracesEndpoint:  "traces-url:4318",
+			tracesInsecure:  true,
+			metricsEndpoint: "localhost:4317",
+			metricsInsecure: false,
 		},
 	}
 
