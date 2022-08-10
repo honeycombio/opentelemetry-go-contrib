@@ -641,7 +641,7 @@ func TestConfigWithResourceAttributes(t *testing.T) {
 	defer shutdown()
 }
 
-func TestThatEndpointFallsBackCorrectly(t *testing.T) {
+func TestThatEndpointsFallBackCorrectly(t *testing.T) {
 	unsetEnvironment()
 	testCases := []struct {
 		name            string
@@ -694,6 +694,14 @@ func TestThatEndpointFallsBackCorrectly(t *testing.T) {
 			),
 			tracesEndpoint:  "traces-url:4318",
 			tracesInsecure:  true,
+			metricsEndpoint: "localhost:4317",
+			metricsInsecure: false,
+		},
+		{
+			name:            "defaults",
+			config:          newConfig(),
+			tracesEndpoint:  "localhost:4317",
+			tracesInsecure:  false,
 			metricsEndpoint: "localhost:4317",
 			metricsInsecure: false,
 		},
