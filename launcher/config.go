@@ -388,7 +388,7 @@ func newResource(c *Config) *resource.Resource {
 
 type setupFunc func(*Config) (func() error, error)
 
-// ensures that a port is set on the given host string, or adds the default port
+// ensures that a port is set on the given host string, or adds the default port.
 func ensurePort(host string, defaultPort string) string {
 	ix := strings.Index(host, ":")
 	switch {
