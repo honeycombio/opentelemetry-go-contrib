@@ -224,6 +224,13 @@ func WithMetricsExporterProtocol(protocol Protocol) Option {
 	}
 }
 
+// WithSampler configures the Sampler to use when processing trace spans.
+func WithSampler(sampler trace.Sampler) Option {
+	return func(c *Config) {
+		c.Sampler = sampler
+	}
+}
+
 // Logger is an interface for a logger that can be passed to WithLogger.
 type Logger interface {
 	Fatalf(format string, v ...interface{})
@@ -290,6 +297,7 @@ type Config struct {
 	Headers                         map[string]string
 	ResourceAttributes              map[string]string
 	SpanProcessors                  []trace.SpanProcessor
+	Sampler                         trace.Sampler
 	Resource                        *resource.Resource
 	Logger                          Logger
 	ShutdownFunctions               []func(c *Config) error
@@ -302,6 +310,7 @@ func newConfig(opts ...Option) *Config {
 		ResourceAttributes: map[string]string{},
 		Logger:             defLogger,
 		errorHandler:       &defaultHandler{logger: defLogger},
+		Sampler:            trace.AlwaysSample(),
 	}
 	envError := envconfig.Process(context.Background(), c)
 	if envError != nil {
@@ -402,50 +411,61 @@ func ensurePort(host string, defaultPort string) string {
 }
 
 func (c *Config) getTracesEndpoint() (string, bool) {
-	// If a Traces-specific protocol wasn't specified, then use the generic one,
-	// which has a default value.
+	// use traces specific endpoint, falling back to generic version if not set
+	if c.TracesExporterEndpoint == "" {
+		// if generic endpoint is empty, traces is disabled
+		if c.ExporterEndpoint == "" {
+			return "", false
+		}
+		c.TracesExporterEndpoint = c.ExporterEndpoint
+		c.TracesExporterEndpointInsecure = c.ExporterEndpointInsecure
+	}
+
+	// use traces specific protocol, falling back to generic version if not set
 	if c.TracesExporterProtocol == "" {
 		c.TracesExporterProtocol = c.ExporterProtocol
 	}
 
-	defaultPort := HTTPDefaultPort
-	if c.TracesExporterProtocol == ProtocolGRPC {
-		defaultPort = GRPCDefaultPort
+	// use traces specific port, failling back to generic version if not set
+	port := GRPCDefaultPort
+	if c.TracesExporterProtocol != ProtocolGRPC {
+		port = HTTPDefaultPort
 	}
-
-	// use traces-specific endpoint, falling back to generic version if not set
-	if c.TracesExporterEndpoint != "" {
-		return ensurePort(c.TracesExporterEndpoint, defaultPort), c.TracesExporterEndpointInsecure
-	}
-	return ensurePort(c.ExporterEndpoint, defaultPort), c.ExporterEndpointInsecure
+	return ensurePort(c.TracesExporterEndpoint, port), c.TracesExporterEndpointInsecure
 }
 
 func (c *Config) getMetricsEndpoint() (string, bool) {
+	// use metrics specific endpoint, falling back to generic version if not set
+	if c.MetricsExporterEndpoint == "" {
+		// if generic endpoint is empty, traces is disabled
+		if c.ExporterEndpoint == "" {
+			return "", false
+		}
+		c.MetricsExporterEndpoint = c.ExporterEndpoint
+		c.MetricsExporterEndpointInsecure = c.ExporterEndpointInsecure
+	}
+
 	// If a Metrics-specific protocol wasn't specified, then use the generic one,
 	// which has a default value.
 	if c.MetricsExporterProtocol == "" {
 		c.MetricsExporterProtocol = c.ExporterProtocol
 	}
 
-	defaultPort := HTTPDefaultPort
+	// use metrics specific port, failling back to generic version if not set
+	port := HTTPDefaultPort
 	if c.MetricsExporterProtocol == ProtocolGRPC {
-		defaultPort = GRPCDefaultPort
+		port = GRPCDefaultPort
 	}
-
-	// use metrics-specific endpoint, falling back to generic version if not set
-	if c.MetricsExporterEndpoint != "" {
-		return ensurePort(c.MetricsExporterEndpoint, defaultPort), c.MetricsExporterEndpointInsecure
-	}
-	return ensurePort(c.ExporterEndpoint, defaultPort), c.ExporterEndpointInsecure
+	return ensurePort(c.MetricsExporterEndpoint, port), c.MetricsExporterEndpointInsecure
 }
 
 func setupTracing(c *Config) (func() error, error) {
-	if !c.TracesEnabled || c.TracesExporterEndpoint == "" {
+	endpoint, insecure := c.getTracesEndpoint()
+	if !c.TracesEnabled || endpoint == "" {
 		c.Logger.Debugf("tracing is disabled by configuration: no endpoint set")
 		return nil, nil
 	}
 
-	endpoint, insecure := c.getTracesEndpoint()
 	return pipelines.NewTracePipeline(pipelines.PipelineConfig{
 		Protocol:       pipelines.Protocol(c.TracesExporterProtocol),
 		Endpoint:       endpoint,
@@ -458,12 +478,12 @@ func setupTracing(c *Config) (func() error, error) {
 }
 
 func setupMetrics(c *Config) (func() error, error) {
-	if !c.MetricsEnabled || c.MetricsExporterEndpoint == "" {
+	endpoint, insecure := c.getMetricsEndpoint()
+	if !c.MetricsEnabled || endpoint == "" {
 		c.Logger.Debugf("metrics are disabled by configuration: no endpoint set")
 		return nil, nil
 	}
 
-	endpoint, insecure := c.getMetricsEndpoint()
 	return pipelines.NewMetricsPipeline(pipelines.PipelineConfig{
 		Protocol:        pipelines.Protocol(c.MetricsExporterProtocol),
 		Endpoint:        endpoint,

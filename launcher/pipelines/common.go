@@ -39,6 +39,7 @@ type PipelineConfig struct {
 	ReportingPeriod string
 	Propagators     []string
 	SpanProcessors  []trace.SpanProcessor
+	Sampler         trace.Sampler
 }
 
 // PipelineSetupFunc defines the interface for a Pipeline Setup function.
