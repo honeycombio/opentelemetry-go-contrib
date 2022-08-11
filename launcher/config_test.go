@@ -18,6 +18,8 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -155,7 +157,6 @@ func testEndpointDisabled(t *testing.T, expected string, opts ...Option) {
 		append(opts,
 			WithLogger(logger),
 			WithServiceName("test-service"),
-			WithMetricsEnabled(false),
 		)...,
 	)
 	defer shutdown()
@@ -168,6 +169,7 @@ func TestTraceEndpointDisabled(t *testing.T) {
 		t,
 		expectedTracingDisabledMessage,
 		WithSpanExporterEndpoint(""),
+		WithExporterEndpoint(""),
 	)
 }
 
@@ -176,6 +178,7 @@ func TestMetricEndpointDisabled(t *testing.T) {
 		t,
 		expectedMetricsDisabledMessage,
 		WithMetricExporterEndpoint(""),
+		WithExporterEndpoint(""),
 	)
 }
 
@@ -306,6 +309,7 @@ func TestDefaultConfig(t *testing.T) {
 		Logger:                          logger,
 		ExporterProtocol:                "grpc",
 		errorHandler:                    handler,
+		Sampler:                         trace.AlwaysSample(),
 	}
 	assert.Equal(t, expected, config)
 }
@@ -349,6 +353,7 @@ func TestEnvironmentVariables(t *testing.T) {
 		Logger:                          logger,
 		ExporterProtocol:                "foobar",
 		errorHandler:                    handler,
+		Sampler:                         trace.AlwaysSample(),
 	}
 	assert.Equal(t, expected, config)
 	unsetEnvironment()
@@ -407,6 +412,7 @@ func TestConfigurationOverrides(t *testing.T) {
 		TracesExporterProtocol:          "tracesProtocol",
 		MetricsExporterProtocol:         "metricsProtocol",
 		errorHandler:                    handler,
+		Sampler:                         trace.AlwaysSample(),
 	}
 	assert.Equal(t, expected, config)
 	unsetEnvironment()
@@ -700,6 +706,31 @@ func TestEmptyTracesEndpointFallsBackToGenericEndpoint(t *testing.T) {
 			assert.Equal(t, tc.metricsInsecure, metricsInsecure)
 		})
 	}
+}
+
+func TestHttpProtoDefaultsToCorrectHostAndPort(t *testing.T) {
+	logger := &testLogger{}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logger.Debugf("recieved data from path: %s", r.URL)
+	}))
+	defer ts.Close()
+
+	shutdown, _ := ConfigureOpenTelemetry(
+		WithLogger(logger),
+		WithExporterEndpoint(strings.TrimPrefix(ts.URL, "http://")),
+		WithExporterInsecure(true),
+		WithExporterProtocol("http/protobuf"),
+	)
+
+	ctx := context.Background()
+	tracer := otel.GetTracerProvider().Tracer("launcher-tests")
+	_, span := tracer.Start(ctx, "test-span")
+	span.End()
+	shutdown()
+
+	assert.True(t, len(logger.output) == 2)
+	logger.requireContains(t, "recieved data from path: /v1/traces")
+	logger.requireContains(t, "recieved data from path: /v1/metrics")
 }
 
 func TestCanConfigureCustomSampler(t *testing.T) {
