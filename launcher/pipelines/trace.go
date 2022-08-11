@@ -37,7 +37,7 @@ import (
 func NewTracePipeline(c PipelineConfig) (func() error, error) {
 	opts := []trace.TracerProviderOption{
 		trace.WithResource(c.Resource),
-		trace.WithSampler(trace.AlwaysSample()),
+		trace.WithSampler(c.Sampler),
 	}
 	for _, sp := range c.SpanProcessors {
 		opts = append(opts, trace.WithSpanProcessor(sp))
