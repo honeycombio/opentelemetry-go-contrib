@@ -10,7 +10,7 @@ go get github.com/opentelemetry-go-contrib/otel-launcher-go/launcher
 
 ## Configure
 
-Minimal setup - by default will send all telemetry to `localhost:4317`
+Minimal setup - by default will send all telemetry via GRPC to `localhost:4317`
 
 ```go
 import "github.com/opentelemetry-go-contrib/otel-launcher-go/launcher"
@@ -41,7 +41,7 @@ func main() {
 ## Configuration Options
 
 | Config Option               | Env Variable                        | Required | Default              |
-| --------------------------  | ----------------------------------- | -------- | -------------------- |
+| --------------------------- | ----------------------------------- | -------- | -------------------- |
 | WithServiceName             | OTEL_SERVICE_NAME                   | y        | -                    |
 | WithServiceVersion          | OTEL_SERVICE_VERSION                | n        | -                    |
 | WithHeaders                 | OTEL_EXPORTER_OTLP_HEADERS          | n        | {}                   |

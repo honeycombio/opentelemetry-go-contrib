@@ -290,7 +290,7 @@ func TestDefaultConfig(t *testing.T) {
 	}
 
 	expected := &Config{
-		ExporterEndpoint:                "localhost:4317",
+		ExporterEndpoint:                "localhost",
 		ExporterEndpointInsecure:        false,
 		TracesExporterEndpoint:          "",
 		TracesExporterEndpointInsecure:  false,
@@ -628,7 +628,6 @@ func TestConfigWithResourceAttributes(t *testing.T) {
 
 	shutdown, _ := ConfigureOpenTelemetry(
 		WithServiceName("test-service"),
-		WithSpanExporterEndpoint("localhost:443"),
 		WithResourceAttributes(map[string]string{
 			"attr1": "val1",
 			"attr2": "val2",
@@ -649,7 +648,7 @@ func TestConfigWithResourceAttributes(t *testing.T) {
 	defer shutdown()
 }
 
-func TestEmptyTracesEndpointFallsBackToGenericEndpoint(t *testing.T) {
+func TestThatEndpointsFallBackCorrectly(t *testing.T) {
 	unsetEnvironment()
 	testCases := []struct {
 		name            string
@@ -673,9 +672,9 @@ func TestEmptyTracesEndpointFallsBackToGenericEndpoint(t *testing.T) {
 				WithExporterEndpoint("generic-url"),
 				WithExporterInsecure(true),
 			),
-			tracesEndpoint:  "generic-url",
+			tracesEndpoint:  "generic-url:4317",
 			tracesInsecure:  true,
-			metricsEndpoint: "generic-url",
+			metricsEndpoint: "generic-url:4317",
 			metricsInsecure: true,
 		},
 		{
@@ -685,13 +684,33 @@ func TestEmptyTracesEndpointFallsBackToGenericEndpoint(t *testing.T) {
 				WithExporterInsecure(false),
 				WithSpanExporterEndpoint("traces-url"),
 				WithSpanExporterInsecure(true),
-				WithMetricExporterEndpoint("metrics-url"),
+				WithMetricExporterEndpoint("metrics-url:1234"),
 				WithMetricExporterInsecure(true),
 			),
-			tracesEndpoint:  "traces-url",
+			tracesEndpoint:  "traces-url:4317",
 			tracesInsecure:  true,
-			metricsEndpoint: "metrics-url",
+			metricsEndpoint: "metrics-url:1234",
 			metricsInsecure: true,
+		},
+		{
+			name: "set traces to protobuf, metrics default",
+			config: newConfig(
+				WithTracesExporterProtocol("http/protobuf"),
+				WithSpanExporterEndpoint("traces-url"),
+				WithSpanExporterInsecure(true),
+			),
+			tracesEndpoint:  "traces-url:4318",
+			tracesInsecure:  true,
+			metricsEndpoint: "localhost:4317",
+			metricsInsecure: false,
+		},
+		{
+			name:            "defaults",
+			config:          newConfig(),
+			tracesEndpoint:  "localhost:4317",
+			tracesInsecure:  false,
+			metricsEndpoint: "localhost:4317",
+			metricsInsecure: false,
 		},
 	}
 
