@@ -215,6 +215,13 @@ func WithMetricsExporterProtocol(protocol Protocol) Option {
 	}
 }
 
+// WithSampler configures the Sampler to use when processing trace spans.
+func WithSampler(sampler trace.Sampler) Option {
+	return func(c *Config) {
+		c.Sampler = sampler
+	}
+}
+
 // Logger is an interface for a logger that can be passed to WithLogger.
 type Logger interface {
 	Fatalf(format string, v ...interface{})
@@ -278,6 +285,7 @@ type Config struct {
 	Headers                         map[string]string
 	ResourceAttributes              map[string]string
 	SpanProcessors                  []trace.SpanProcessor
+	Sampler                         trace.Sampler
 	Resource                        *resource.Resource
 	Logger                          Logger
 	ShutdownFunctions               []func(c *Config) error
@@ -290,6 +298,7 @@ func newConfig(opts ...Option) *Config {
 		ResourceAttributes: map[string]string{},
 		Logger:             defLogger,
 		errorHandler:       &defaultHandler{logger: defLogger},
+		Sampler:            trace.AlwaysSample(),
 	}
 	envError := envconfig.Process(context.Background(), c)
 	if envError != nil {

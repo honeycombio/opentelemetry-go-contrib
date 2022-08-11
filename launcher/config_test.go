@@ -30,6 +30,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.10.0"
 	collectormetrics "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	collectortrace "go.opentelemetry.io/proto/otlp/collector/trace/v1"
@@ -156,7 +157,6 @@ func testEndpointDisabled(t *testing.T, expected string, opts ...Option) {
 		append(opts,
 			WithLogger(logger),
 			WithServiceName("test-service"),
-			WithMetricsEnabled(false),
 		)...,
 	)
 	defer shutdown()
@@ -169,6 +169,7 @@ func TestTraceEndpointDisabled(t *testing.T) {
 		t,
 		expectedTracingDisabledMessage,
 		WithSpanExporterEndpoint(""),
+		WithExporterEndpoint(""),
 	)
 }
 
@@ -177,6 +178,7 @@ func TestMetricEndpointDisabled(t *testing.T) {
 		t,
 		expectedMetricsDisabledMessage,
 		WithMetricExporterEndpoint(""),
+		WithExporterEndpoint(""),
 	)
 }
 
@@ -307,6 +309,7 @@ func TestDefaultConfig(t *testing.T) {
 		Logger:                          logger,
 		ExporterProtocol:                "grpc",
 		errorHandler:                    handler,
+		Sampler:                         trace.AlwaysSample(),
 	}
 	assert.Equal(t, expected, config)
 }
@@ -350,6 +353,7 @@ func TestEnvironmentVariables(t *testing.T) {
 		Logger:                          logger,
 		ExporterProtocol:                "foobar",
 		errorHandler:                    handler,
+		Sampler:                         trace.AlwaysSample(),
 	}
 	assert.Equal(t, expected, config)
 	unsetEnvironment()
@@ -408,6 +412,7 @@ func TestConfigurationOverrides(t *testing.T) {
 		TracesExporterProtocol:          "tracesProtocol",
 		MetricsExporterProtocol:         "metricsProtocol",
 		errorHandler:                    handler,
+		Sampler:                         trace.AlwaysSample(),
 	}
 	assert.Equal(t, expected, config)
 	unsetEnvironment()
@@ -726,6 +731,25 @@ func TestHttpProtoDefaultsToCorrectHostAndPort(t *testing.T) {
 	assert.True(t, len(logger.output) == 2)
 	logger.requireContains(t, "recieved data from path: /v1/traces")
 	logger.requireContains(t, "recieved data from path: /v1/metrics")
+}
+
+func TestCanConfigureCustomSampler(t *testing.T) {
+	sampler := &testSampler{}
+	config := newConfig(
+		WithSampler(sampler),
+	)
+
+	assert.Same(t, config.Sampler, sampler)
+}
+
+type testSampler struct{}
+
+func (ts *testSampler) ShouldSample(parameters trace.SamplingParameters) trace.SamplingResult {
+	return trace.SamplingResult{}
+}
+
+func (ts *testSampler) Description() string {
+	return "testSampler"
 }
 
 // setenv is to stop the linter from complaining.
