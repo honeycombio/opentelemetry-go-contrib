@@ -730,7 +730,7 @@ func TestThatEndpointsFallBackCorrectly(t *testing.T) {
 func TestHttpProtoDefaultsToCorrectHostAndPort(t *testing.T) {
 	logger := &testLogger{}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger.Debugf("recieved data from path: %s", r.URL)
+		logger.Debugf("received data from path: %s", r.URL)
 	}))
 	defer ts.Close()
 
@@ -748,8 +748,8 @@ func TestHttpProtoDefaultsToCorrectHostAndPort(t *testing.T) {
 	shutdown()
 
 	assert.True(t, len(logger.output) == 2)
-	logger.requireContains(t, "recieved data from path: /v1/traces")
-	logger.requireContains(t, "recieved data from path: /v1/metrics")
+	logger.requireContains(t, "received data from path: /v1/traces")
+	logger.requireContains(t, "received data from path: /v1/metrics")
 }
 
 func TestCanConfigureCustomSampler(t *testing.T) {
