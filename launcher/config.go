@@ -67,15 +67,15 @@ func WithExporterInsecure(insecure bool) Option {
 	}
 }
 
-// WithMetricExporterEndpoint configures the endpoint for sending metrics via OTLP.
-func WithMetricExporterEndpoint(url string) Option {
+// WithMetricsExporterEndpoint configures the endpoint for sending metrics via OTLP.
+func WithMetricsExporterEndpoint(url string) Option {
 	return func(c *Config) {
 		c.MetricsExporterEndpoint = url
 	}
 }
 
-// WithSpanExporterEndpoint configures the endpoint for sending traces via OTLP.
-func WithSpanExporterEndpoint(url string) Option {
+// WithTracesExporterEndpoint configures the endpoint for sending traces via OTLP.
+func WithTracesExporterEndpoint(url string) Option {
 	return func(c *Config) {
 		c.TracesExporterEndpoint = url
 	}
@@ -114,17 +114,17 @@ func WithLogLevel(loglevel string) Option {
 	}
 }
 
-// WithSpanExporterInsecure permits connecting to the
+// WithTracesExporterInsecure permits connecting to the
 // trace endpoint without a certificate.
-func WithSpanExporterInsecure(insecure bool) Option {
+func WithTracesExporterInsecure(insecure bool) Option {
 	return func(c *Config) {
 		c.TracesExporterEndpointInsecure = insecure
 	}
 }
 
-// WithMetricExporterInsecure permits connecting to the
+// WithMetricsExporterInsecure permits connecting to the
 // metric endpoint without a certificate.
-func WithMetricExporterInsecure(insecure bool) Option {
+func WithMetricsExporterInsecure(insecure bool) Option {
 	return func(c *Config) {
 		c.MetricsExporterEndpointInsecure = insecure
 	}
@@ -155,15 +155,15 @@ func WithErrorHandler(handler otel.ErrorHandler) Option {
 	}
 }
 
-// WithMetricReportingPeriod configures the metric reporting period,
+// WithMetricsReportingPeriod configures the metric reporting period,
 // how often the controller collects and exports metric data.
-func WithMetricReportingPeriod(p time.Duration) Option {
+func WithMetricsReportingPeriod(p time.Duration) Option {
 	return func(c *Config) {
 		c.MetricsReportingPeriod = fmt.Sprint(p)
 	}
 }
 
-// WithMetricEnabled configures whether metrics should be enabled.
+// WithMetricsEnabled configures whether metrics should be enabled.
 func WithMetricsEnabled(enabled bool) Option {
 	return func(c *Config) {
 		c.MetricsEnabled = enabled

@@ -127,10 +127,10 @@ func dummyGRPCListener() func() {
 // This is a convenience function.
 func withTestExporters() Option {
 	return func(c *Config) {
-		WithSpanExporterEndpoint("localhost:4317")(c)
-		WithSpanExporterInsecure(true)(c)
-		WithMetricExporterEndpoint("localhost:4317")(c)
-		WithMetricExporterInsecure(true)(c)
+		WithTracesExporterEndpoint("localhost:4317")(c)
+		WithTracesExporterInsecure(true)(c)
+		WithMetricsExporterEndpoint("localhost:4317")(c)
+		WithMetricsExporterInsecure(true)(c)
 	}
 }
 
@@ -168,7 +168,7 @@ func TestTraceEndpointDisabled(t *testing.T) {
 	testEndpointDisabled(
 		t,
 		expectedTracingDisabledMessage,
-		WithSpanExporterEndpoint(""),
+		WithTracesExporterEndpoint(""),
 		WithExporterEndpoint(""),
 	)
 }
@@ -177,7 +177,7 @@ func TestMetricEndpointDisabled(t *testing.T) {
 	testEndpointDisabled(
 		t,
 		expectedMetricsDisabledMessage,
-		WithMetricExporterEndpoint(""),
+		WithMetricsExporterEndpoint(""),
 		WithExporterEndpoint(""),
 	)
 }
@@ -238,7 +238,7 @@ func TestInvalidMetricsPushIntervalConfig(t *testing.T) {
 	shutdown, _ := ConfigureOpenTelemetry(
 		WithLogger(logger),
 		WithServiceName("test-service"),
-		WithMetricReportingPeriod(-time.Second),
+		WithMetricsReportingPeriod(-time.Second),
 		withTestExporters(),
 	)
 	defer shutdown()
@@ -368,10 +368,10 @@ func TestConfigurationOverrides(t *testing.T) {
 		WithServiceVersion("override-service-version"),
 		WithExporterEndpoint("override-generic-url"),
 		WithExporterInsecure(false),
-		WithSpanExporterEndpoint("override-traces-url"),
-		WithSpanExporterInsecure(false),
-		WithMetricExporterEndpoint("override-metrics-url"),
-		WithMetricExporterInsecure(false),
+		WithTracesExporterEndpoint("override-traces-url"),
+		WithTracesExporterInsecure(false),
+		WithMetricsExporterEndpoint("override-metrics-url"),
+		WithMetricsExporterInsecure(false),
 		WithLogLevel("info"),
 		WithLogger(logger),
 		WithErrorHandler(handler),
@@ -605,7 +605,7 @@ func TestEmptyHostnameDefaultsToOsHostname(t *testing.T) {
 	setenv("OTEL_RESOURCE_ATTRIBUTES", "host.name=")
 	shutdown, _ := ConfigureOpenTelemetry(
 		WithServiceName("test-service"),
-		WithSpanExporterEndpoint("localhost:443"),
+		WithTracesExporterEndpoint("localhost:443"),
 		WithResourceAttributes(map[string]string{
 			"attr1":     "val1",
 			"host.name": "",
@@ -682,10 +682,10 @@ func TestThatEndpointsFallBackCorrectly(t *testing.T) {
 			config: newConfig(
 				WithExporterEndpoint("generic-url"),
 				WithExporterInsecure(false),
-				WithSpanExporterEndpoint("traces-url"),
-				WithSpanExporterInsecure(true),
-				WithMetricExporterEndpoint("metrics-url:1234"),
-				WithMetricExporterInsecure(true),
+				WithTracesExporterEndpoint("traces-url"),
+				WithTracesExporterInsecure(true),
+				WithMetricsExporterEndpoint("metrics-url:1234"),
+				WithMetricsExporterInsecure(true),
 			),
 			tracesEndpoint:  "traces-url:4317",
 			tracesInsecure:  true,
@@ -696,8 +696,8 @@ func TestThatEndpointsFallBackCorrectly(t *testing.T) {
 			name: "set traces to protobuf, metrics default",
 			config: newConfig(
 				WithTracesExporterProtocol("http/protobuf"),
-				WithSpanExporterEndpoint("traces-url"),
-				WithSpanExporterInsecure(true),
+				WithTracesExporterEndpoint("traces-url"),
+				WithTracesExporterInsecure(true),
 			),
 			tracesEndpoint:  "traces-url:4318",
 			tracesInsecure:  true,
@@ -730,7 +730,7 @@ func TestThatEndpointsFallBackCorrectly(t *testing.T) {
 func TestHttpProtoDefaultsToCorrectHostAndPort(t *testing.T) {
 	logger := &testLogger{}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger.Debugf("recieved data from path: %s", r.URL)
+		logger.Debugf("received data from path: %s", r.URL)
 	}))
 	defer ts.Close()
 
@@ -748,8 +748,8 @@ func TestHttpProtoDefaultsToCorrectHostAndPort(t *testing.T) {
 	shutdown()
 
 	assert.True(t, len(logger.output) == 2)
-	logger.requireContains(t, "recieved data from path: /v1/traces")
-	logger.requireContains(t, "recieved data from path: /v1/metrics")
+	logger.requireContains(t, "received data from path: /v1/traces")
+	logger.requireContains(t, "received data from path: /v1/metrics")
 }
 
 func TestCanConfigureCustomSampler(t *testing.T) {
