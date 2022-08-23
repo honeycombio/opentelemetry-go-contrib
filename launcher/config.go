@@ -95,7 +95,7 @@ func WithServiceVersion(version string) Option {
 	}
 }
 
-// WithHeaders configures OTLP/gRPC connection headers.
+// WithHeaders configures OTLP exporter headers.
 func WithHeaders(headers map[string]string) Option {
 	return func(c *Config) {
 		if c.Headers == nil {
@@ -103,6 +103,27 @@ func WithHeaders(headers map[string]string) Option {
 		}
 		for k, v := range headers {
 			c.Headers[k] = v
+		}
+	}
+}
+
+// WithHeaders configures OTLP traces exporter headers.
+func WithTracesHeaders(headers map[string]string) Option {
+	return func(c *Config) {
+		for k, v := range headers {
+			c.TracesHeaders[k] = v
+		}
+	}
+}
+
+// WithHeaders configures OTLP metrics exporter headers.
+func WithMetricsHeaders(headers map[string]string) Option {
+	return func(c *Config) {
+		if c.Headers == nil {
+			c.Headers = make(map[string]string)
+		}
+		for k, v := range headers {
+			c.MetricsHeaders[k] = v
 		}
 	}
 }
@@ -289,12 +310,13 @@ type Config struct {
 	MetricsReportingPeriod          string   `env:"OTEL_EXPORTER_OTLP_METRICS_PERIOD,default=30s"`
 	LogLevel                        string   `env:"OTEL_LOG_LEVEL,default=info"`
 	Propagators                     []string `env:"OTEL_PROPAGATORS,default=tracecontext,baggage"`
-	HeadersFromEnv                  string   `env:"OTEL_EXPORTER_OTLP_HEADERS"`
 	ResourceAttributesFromEnv       string   `env:"OTEL_RESOURCE_ATTRIBUTES"`
 	ExporterProtocol                Protocol `env:"OTEL_EXPORTER_OTLP_PROTOCOL,default=grpc"`
 	TracesExporterProtocol          Protocol `env:"OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"`
 	MetricsExporterProtocol         Protocol `env:"OTEL_EXPORTER_OTLP_METRICS_PROTOCOL"`
 	Headers                         map[string]string
+	TracesHeaders                   map[string]string
+	MetricsHeaders                  map[string]string
 	ResourceAttributes              map[string]string
 	SpanProcessors                  []trace.SpanProcessor
 	Sampler                         trace.Sampler
@@ -307,6 +329,8 @@ type Config struct {
 func newConfig(opts ...Option) *Config {
 	c := &Config{
 		Headers:            map[string]string{},
+		TracesHeaders:      map[string]string{},
+		MetricsHeaders:     map[string]string{},
 		ResourceAttributes: map[string]string{},
 		Logger:             defLogger,
 		errorHandler:       &defaultHandler{logger: defLogger},
@@ -459,6 +483,18 @@ func (c *Config) getMetricsEndpoint() (string, bool) {
 	return ensurePort(c.MetricsExporterEndpoint, port), c.MetricsExporterEndpointInsecure
 }
 
+// getTracesExporterHeaders combines and returns both generic and traces headers
+func getTracesExporterHeaders(c *Config) map[string]string {
+	headers := map[string]string{}
+	for key, value := range c.Headers {
+		headers[key] = value
+	}
+	for key, value := range c.TracesHeaders {
+		headers[key] = value
+	}
+	return headers
+}
+
 func setupTracing(c *Config) (func() error, error) {
 	endpoint, insecure := c.getTracesEndpoint()
 	if !c.TracesEnabled || endpoint == "" {
@@ -470,11 +506,24 @@ func setupTracing(c *Config) (func() error, error) {
 		Protocol:       pipelines.Protocol(c.TracesExporterProtocol),
 		Endpoint:       endpoint,
 		Insecure:       insecure,
-		Headers:        c.Headers,
+		Headers:        getTracesExporterHeaders(c),
 		Resource:       c.Resource,
 		Propagators:    c.Propagators,
 		SpanProcessors: c.SpanProcessors,
 	})
+}
+
+// getTracesHeaders combines and returns both generic and traces headers
+func getMetricsExporterHeaders(c *Config) map[string]string {
+	// copy custom generic and metrics headers
+	headers := map[string]string{}
+	for key, value := range c.Headers {
+		headers[key] = value
+	}
+	for key, value := range c.MetricsHeaders {
+		headers[key] = value
+	}
+	return headers
 }
 
 func setupMetrics(c *Config) (func() error, error) {
@@ -488,7 +537,7 @@ func setupMetrics(c *Config) (func() error, error) {
 		Protocol:        pipelines.Protocol(c.MetricsExporterProtocol),
 		Endpoint:        endpoint,
 		Insecure:        insecure,
-		Headers:         c.Headers,
+		Headers:         getMetricsExporterHeaders(c),
 		Resource:        c.Resource,
 		ReportingPeriod: c.MetricsReportingPeriod,
 	})
