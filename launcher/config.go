@@ -483,7 +483,7 @@ func (c *Config) getMetricsEndpoint() (string, bool) {
 	return ensurePort(c.MetricsExporterEndpoint, port), c.MetricsExporterEndpointInsecure
 }
 
-// getTracesExporterHeaders combines and returns both generic and traces headers
+// getTracesExporterHeaders combines and returns both generic and traces headers.
 func getTracesExporterHeaders(c *Config) map[string]string {
 	headers := map[string]string{}
 	for key, value := range c.Headers {
@@ -513,7 +513,7 @@ func setupTracing(c *Config) (func() error, error) {
 	})
 }
 
-// getTracesHeaders combines and returns both generic and traces headers
+// getMetricsExporterHeaders combines and returns both generic and traces headers.
 func getMetricsExporterHeaders(c *Config) map[string]string {
 	// copy custom generic and metrics headers
 	headers := map[string]string{}
