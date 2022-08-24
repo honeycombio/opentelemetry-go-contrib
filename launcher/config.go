@@ -107,7 +107,7 @@ func WithHeaders(headers map[string]string) Option {
 	}
 }
 
-// WithHeaders configures OTLP traces exporter headers.
+// WithTracesHeaders configures OTLP traces exporter headers.
 func WithTracesHeaders(headers map[string]string) Option {
 	return func(c *Config) {
 		for k, v := range headers {
@@ -116,7 +116,7 @@ func WithTracesHeaders(headers map[string]string) Option {
 	}
 }
 
-// WithHeaders configures OTLP metrics exporter headers.
+// WithMetricsHeaders configures OTLP metrics exporter headers.
 func WithMetricsHeaders(headers map[string]string) Option {
 	return func(c *Config) {
 		if c.Headers == nil {
@@ -483,13 +483,25 @@ func (c *Config) getMetricsEndpoint() (string, bool) {
 	return ensurePort(c.MetricsExporterEndpoint, port), c.MetricsExporterEndpointInsecure
 }
 
-// getTracesExporterHeaders combines and returns both generic and traces headers.
-func getTracesExporterHeaders(c *Config) map[string]string {
+func (c *Config) getTracesHeaders() map[string]string {
+	// combine generic and traces headers
 	headers := map[string]string{}
 	for key, value := range c.Headers {
 		headers[key] = value
 	}
 	for key, value := range c.TracesHeaders {
+		headers[key] = value
+	}
+	return headers
+}
+
+func (c *Config) getMetricsHeaders() map[string]string {
+	// combine generic and metrics headers
+	headers := map[string]string{}
+	for key, value := range c.Headers {
+		headers[key] = value
+	}
+	for key, value := range c.MetricsHeaders {
 		headers[key] = value
 	}
 	return headers
@@ -506,24 +518,11 @@ func setupTracing(c *Config) (func() error, error) {
 		Protocol:       pipelines.Protocol(c.TracesExporterProtocol),
 		Endpoint:       endpoint,
 		Insecure:       insecure,
-		Headers:        getTracesExporterHeaders(c),
+		Headers:        c.getTracesHeaders(),
 		Resource:       c.Resource,
 		Propagators:    c.Propagators,
 		SpanProcessors: c.SpanProcessors,
 	})
-}
-
-// getMetricsExporterHeaders combines and returns both generic and traces headers.
-func getMetricsExporterHeaders(c *Config) map[string]string {
-	// copy custom generic and metrics headers
-	headers := map[string]string{}
-	for key, value := range c.Headers {
-		headers[key] = value
-	}
-	for key, value := range c.MetricsHeaders {
-		headers[key] = value
-	}
-	return headers
 }
 
 func setupMetrics(c *Config) (func() error, error) {
@@ -537,7 +536,7 @@ func setupMetrics(c *Config) (func() error, error) {
 		Protocol:        pipelines.Protocol(c.MetricsExporterProtocol),
 		Endpoint:        endpoint,
 		Insecure:        insecure,
-		Headers:         getMetricsExporterHeaders(c),
+		Headers:         c.getMetricsHeaders(),
 		Resource:        c.Resource,
 		ReportingPeriod: c.MetricsReportingPeriod,
 	})

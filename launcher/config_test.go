@@ -772,11 +772,11 @@ func TestGenericAndSignalHeadersAreCombined(t *testing.T) {
 		assert.Equal(t, map[string]string{
 			"lnchr-headers": "true",
 			"lnchr-traces":  "true",
-		}, getTracesExporterHeaders(c))
+		}, c.getTracesHeaders())
 		assert.Equal(t, map[string]string{
 			"lnchr-headers": "true",
 			"lnchr-metrics": "true",
-		}, getMetricsExporterHeaders(c))
+		}, c.getMetricsHeaders())
 		return nil
 	}
 
