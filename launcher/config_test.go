@@ -303,6 +303,8 @@ func TestDefaultConfig(t *testing.T) {
 		MetricsReportingPeriod:          "30s",
 		LogLevel:                        "info",
 		Headers:                         map[string]string{},
+		TracesHeaders:                   map[string]string{},
+		MetricsHeaders:                  map[string]string{},
 		ResourceAttributes:              map[string]string{},
 		Propagators:                     []string{"tracecontext", "baggage"},
 		Resource:                        resource.NewWithAttributes(semconv.SchemaURL, attributes...),
@@ -346,6 +348,8 @@ func TestEnvironmentVariables(t *testing.T) {
 		MetricsReportingPeriod:          "30s",
 		LogLevel:                        "debug",
 		Headers:                         map[string]string{},
+		TracesHeaders:                   map[string]string{},
+		MetricsHeaders:                  map[string]string{},
 		ResourceAttributes:              map[string]string{},
 		ResourceAttributesFromEnv:       "service.name=test-service-name-b",
 		Propagators:                     []string{"b3", "w3c"},
@@ -403,6 +407,8 @@ func TestConfigurationOverrides(t *testing.T) {
 		MetricsReportingPeriod:          "30s",
 		LogLevel:                        "info",
 		Headers:                         map[string]string{},
+		TracesHeaders:                   map[string]string{},
+		MetricsHeaders:                  map[string]string{},
 		ResourceAttributes:              map[string]string{},
 		ResourceAttributesFromEnv:       "service.name=test-service-name-b",
 		Propagators:                     []string{"b3"},
@@ -759,6 +765,33 @@ func TestCanConfigureCustomSampler(t *testing.T) {
 	)
 
 	assert.Same(t, config.Sampler, sampler)
+}
+
+func TestGenericAndSignalHeadersAreCombined(t *testing.T) {
+	ValidateConfig = func(c *Config) error {
+		assert.Equal(t, map[string]string{
+			"lnchr-headers": "true",
+			"lnchr-traces":  "true",
+		}, c.getTracesHeaders())
+		assert.Equal(t, map[string]string{
+			"lnchr-headers": "true",
+			"lnchr-metrics": "true",
+		}, c.getMetricsHeaders())
+		return nil
+	}
+
+	_, err := ConfigureOpenTelemetry(
+		WithHeaders(map[string]string{
+			"lnchr-headers": "true",
+		}),
+		WithTracesHeaders(map[string]string{
+			"lnchr-traces": "true",
+		}),
+		WithMetricsHeaders(map[string]string{
+			"lnchr-metrics": "true",
+		}),
+	)
+	assert.Nil(t, err)
 }
 
 type testSampler struct{}
