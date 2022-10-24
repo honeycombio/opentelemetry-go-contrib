@@ -803,15 +803,6 @@ func TestDefaultLoggerLogLevelIsInfo(t *testing.T) {
 	}
 }
 
-func TestDefaultLoggerUsesConfiguredLogLevel(t *testing.T) {
-	c := newConfig(WithLogLevel("fatal"))
-	if l, ok := c.Logger.(*defaultLogger); ok {
-		assert.Equal(t, "fatal", l.logLevel)
-	} else {
-		assert.Fail(t, "default logger is not a defaultLogger")
-	}
-}
-
 type testSampler struct{}
 
 func (ts *testSampler) ShouldSample(parameters trace.SamplingParameters) trace.SamplingResult {
