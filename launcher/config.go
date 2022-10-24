@@ -271,6 +271,7 @@ func WithLogger(logger Logger) Option {
 }
 
 type defaultLogger struct {
+	logLevel string
 }
 
 func (l *defaultLogger) Fatalf(format string, v ...interface{}) {
@@ -279,10 +280,12 @@ func (l *defaultLogger) Fatalf(format string, v ...interface{}) {
 }
 
 func (l *defaultLogger) Debugf(format string, v ...interface{}) {
-	log.Printf(format, v...)
+	if l.logLevel == "debug" {
+		log.Printf(format, v...)
+	}
 }
 
-var defLogger Logger = &defaultLogger{}
+var defLogger Logger = &defaultLogger{logLevel: "info"}
 
 type defaultHandler struct {
 	logger Logger
@@ -350,6 +353,11 @@ func newConfig(opts ...Option) *Config {
 	// apply vendor options then user options
 	for _, opt := range append(vendorOpts, opts...) {
 		opt(c)
+	}
+
+	// If using defaultLogger, update it's LogLevel to configured level
+	if l, ok := c.Logger.(*defaultLogger); ok {
+		l.logLevel = c.LogLevel
 	}
 
 	c.Resource = newResource(c)
