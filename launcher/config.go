@@ -24,8 +24,10 @@ import (
 	"time"
 
 	// TODO: before merging, update to "go.opentelemetry.io/contrib/launcher".
+	"github.com/honeycombio/opentelemetry-go-contrib/exporters/autoexport"
 	"github.com/honeycombio/opentelemetry-go-contrib/launcher/pipelines"
 	"github.com/sethvargo/go-envconfig"
+	"go.opentelemetry.io/contrib/propagators/autoprop"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -516,21 +518,31 @@ func (c *Config) getMetricsHeaders() map[string]string {
 }
 
 func setupTracing(c *Config) (func() error, error) {
-	endpoint, insecure := c.getTracesEndpoint()
+	endpoint, _ := c.getTracesEndpoint()
 	if !c.TracesEnabled || endpoint == "" {
 		c.Logger.Debugf("tracing is disabled by configuration: no endpoint set")
 		return nil, nil
 	}
 
-	return pipelines.NewTracePipeline(pipelines.PipelineConfig{
-		Protocol:       pipelines.Protocol(c.TracesExporterProtocol),
-		Endpoint:       endpoint,
-		Insecure:       insecure,
-		Headers:        c.getTracesHeaders(),
-		Resource:       c.Resource,
-		Propagators:    c.Propagators,
-		SpanProcessors: c.SpanProcessors,
-	})
+	opts := []trace.TracerProviderOption{
+		trace.WithResource(c.Resource),
+		trace.WithSampler(c.Sampler),
+	}
+	for _, sp := range c.SpanProcessors {
+		opts = append(opts, trace.WithSpanProcessor(sp))
+	}
+
+	for _, exp := range autoexport.NewTraceExporters() {
+		opts = append(opts, trace.WithBatcher(exp))
+	}
+
+	tp := trace.NewTracerProvider(opts...)
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(autoprop.NewTextMapPropagator())
+
+	return func() error {
+		return tp.Shutdown(context.Background())
+	}, nil
 }
 
 func setupMetrics(c *Config) (func() error, error) {
