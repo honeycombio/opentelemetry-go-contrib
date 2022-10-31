@@ -17,7 +17,6 @@ package eks // import "go.opentelemetry.io/contrib/detectors/aws/eks"
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
@@ -28,7 +27,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.10.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 )
 
 const (
@@ -181,7 +180,7 @@ func getClusterName(ctx context.Context, utils detectorUtils) (string, error) {
 
 // getContainerID returns the containerID if currently running within a container.
 func (eksUtils eksDetectorUtils) getContainerID() (string, error) {
-	fileData, err := ioutil.ReadFile(defaultCgroupPath)
+	fileData, err := os.ReadFile(defaultCgroupPath)
 	if err != nil {
 		return "", fmt.Errorf("getContainerID() error: cannot read file with path %s: %w", defaultCgroupPath, err)
 	}
