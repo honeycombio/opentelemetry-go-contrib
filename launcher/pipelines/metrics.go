@@ -21,14 +21,15 @@ import (
 	"fmt"
 	"time"
 
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/encoding/gzip"
+
 	hostMetrics "go.opentelemetry.io/contrib/instrumentation/host"
 	runtimeMetrics "go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	metricglobal "go.opentelemetry.io/otel/metric/global"
 	"go.opentelemetry.io/otel/sdk/metric"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/encoding/gzip"
 )
 
 // NewMetricsPipeline takes a PipelineConfig and builds a metrics pipeline.
