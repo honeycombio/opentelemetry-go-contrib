@@ -20,6 +20,9 @@ import (
 	"errors"
 	"fmt"
 
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/encoding/gzip"
+
 	"go.opentelemetry.io/contrib/propagators/b3"
 	"go.opentelemetry.io/contrib/propagators/ot"
 	"go.opentelemetry.io/otel"
@@ -28,8 +31,6 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/trace"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/encoding/gzip"
 )
 
 // NewTracePipeline creates a new trace pipeline from a config.
