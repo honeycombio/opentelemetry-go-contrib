@@ -325,8 +325,8 @@ type Config struct {
 	SpanProcessors                  []trace.SpanProcessor
 	Sampler                         trace.Sampler
 	Resource                        *resource.Resource
-	Logger                          Logger
-	ShutdownFunctions               []func(c *Config) error
+	Logger                          Logger                  `json:"-"`
+	ShutdownFunctions               []func(c *Config) error `json:"-"`
 	errorHandler                    otel.ErrorHandler
 }
 
